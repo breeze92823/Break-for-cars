@@ -1,5 +1,5 @@
 import './hud.css'
-import { BLOCK_THEMES, HUD_DEMO } from '../config.js'
+import { BLOCK_THEMES, FREE_CAR, HUD_DEMO } from '../config.js'
 import * as bloxity from '../bloxity.js'
 import { onKey } from '../input.js'
 import { fontReady } from '../propkit.js'
@@ -47,7 +47,7 @@ function el(tag, cls, html) {
 }
 const outlined = (text, cls = 'ol') => `<span class="${cls}">${text}</span>`
 
-export function createHud({ onShop, onPlot, onSpin, onCollectAll, onAutoSwing, onSlot, onDaily, onSettings, onIndex, money: startMoney = 0 }) {
+export function createHud({ onShop, onPlot, onSpin, onCollectAll, onAutoSwing, onSlot, onDaily, onSettings, onIndex, onFreeCar, money: startMoney = 0 }) {
   const root = el('div', 'hud')
 
   // --- Top row ---
@@ -78,7 +78,9 @@ export function createHud({ onShop, onPlot, onSpin, onCollectAll, onAutoSwing, o
   // --- Left column ---
   const left = el('div', 'hud-left')
   const index = el('button', 'tile index studs', `${SVG.index}<span class="name ol">Index</span>`)
-  const free = el('button', 'free-btn', `<span class="rays"></span><img alt=""><span class="name ol">FREE!</span>`)
+  // FREE! car (game/freecar.js): counts down on itself, lights up with a "!" once it can be claimed.
+  const free = el('button', 'free-btn', `<span class="rays"></span><img alt=""><span class="name ol">FREE!</span><span class="badge alert ol-thin" hidden>!</span>`)
+  free.setAttribute('aria-label', 'Free car')
   const autoSwing = el('button', 'wide-btn studs', `${SVG.pickaxe}${outlined('Auto Swing')}`)
   left.append(index, free, autoSwing)
   autoSwing.addEventListener('click', () => {
@@ -87,7 +89,7 @@ export function createHud({ onShop, onPlot, onSpin, onCollectAll, onAutoSwing, o
     onAutoSwing?.(on)
   })
   index.addEventListener('click', () => (onIndex ? onIndex() : toast('Index: coming soon')))
-  for (const [b, name] of [[free, 'Free car']]) b.addEventListener('click', () => toast(`${name}: coming soon`))
+  free.addEventListener('click', () => (onFreeCar ? onFreeCar() : toast('Free car: coming soon')))
 
   // --- Right column: offers ---
   const right = el('div', 'hud-right')
@@ -186,20 +188,36 @@ export function createHud({ onShop, onPlot, onSpin, onCollectAll, onAutoSwing, o
 
   // Keep clear of Bloxity's toolbar + chat: the left column starts under them; the
   // top row stays centred unless that would overlap them, then it slides right of
-  // them, and only drops below them when there is no room beside.
+  // them, and only drops below them when there is no room beside. On a phone in
+  // portrait (hud.css stacks the row into a column) it sits against the right edge,
+  // beside the chat, so it stays near the top instead of over the player.
+  const portrait = window.matchMedia('(max-width: 520px)')
   let reserved = []
+  // Bloxity's areas plus the touch layer's corner buttons (touch.js), when shown.
+  // In portrait also the left tiles' row, so a column with no room beside the chat
+  // drops under that row instead of onto it.
+  function obstacles(stacked) {
+    const list = [...reserved]
+    for (const e of [document.querySelector('.touch-ui .touch-top'), stacked && left]) {
+      const r = e?.getBoundingClientRect()
+      if (r?.width) list.push({ left: r.left, top: r.top, width: r.width, height: r.height })
+    }
+    return list
+  }
   function layoutTop() {
     const w = window.innerWidth
     const rowW = top.offsetWidth
     const rowH = top.offsetHeight
-    const baseTop = parseFloat(getComputedStyle(top).getPropertyValue('--base-top')) || 0
-    let x = (w - rowW) / 2
+    const baseTop = parseFloat(getComputedStyle(top).top) || 0 // --base-top, resolved to px
+    const stacked = portrait.matches
+    const areas = obstacles(stacked)
+    let x = stacked ? w - rowW - 8 : (w - rowW) / 2
     let y = 0
-    const hits = (ax, ay) => reserved.some((a) => ax < a.left + a.width && ax + rowW > a.left && ay < a.top + a.height && ay + rowH + baseTop > a.top)
+    const hits = (ax, ay) => areas.some((a) => ax < a.left + a.width && ax + rowW > a.left && baseTop + ay < a.top + a.height && baseTop + ay + rowH > a.top)
     if (hits(x, y)) {
-      const right = Math.max(...reserved.filter((a) => a.top < rowH + baseTop + 20).map((a) => a.left + a.width)) + 10
-      if (right + rowW <= w - 10 && !hits(right, y)) x = right
-      else y = Math.max(...reserved.filter((a) => a.left < x + rowW && a.left + a.width > x).map((a) => a.top + a.height)) + 8 - baseTop
+      const right = Math.max(0, ...reserved.filter((a) => a.top < rowH + baseTop + 20).map((a) => a.left + a.width)) + 10
+      if (!stacked && right + rowW <= w - 10 && !hits(right, y)) x = right
+      else y = Math.max(...areas.filter((a) => a.left < x + rowW && a.left + a.width > x).map((a) => a.top + a.height)) + 8 - baseTop
     }
     top.style.left = `${Math.round(x)}px`
     top.style.marginTop = `${Math.max(0, Math.round(y))}px`
@@ -212,14 +230,17 @@ export function createHud({ onShop, onPlot, onSpin, onCollectAll, onAutoSwing, o
     requestAnimationFrame(layoutTop)
   })
   window.addEventListener('resize', () => requestAnimationFrame(layoutTop))
+  portrait.addEventListener?.('change', () => requestAnimationFrame(layoutTop))
+  // The touch controls come and go (a finger shows them, a mouse click hides them).
+  new MutationObserver(() => requestAnimationFrame(layoutTop)).observe(document.body, { attributes: true, attributeFilter: ['class'] })
   fontReady.then(() => requestAnimationFrame(layoutTop))
 
   // Icons from the 3D models, once the font is in (block faces carry a "?").
   fontReady.then(() => {
-    icons = renderIcons([HUD_DEMO.freeCar], Object.keys(BLOCK_THEMES))
+    icons = renderIcons([FREE_CAR.car.look], Object.keys(BLOCK_THEMES))
     slots[0].querySelector('img').src = toolIcon ?? icons.hammer
     paintCarry()
-    free.querySelector('img').src = icons[`car:${HUD_DEMO.freeCar}`]
+    free.querySelector('img').src = icons[`car:${FREE_CAR.car.look}`]
   })
 
   // Money counts toward its target.
@@ -248,6 +269,14 @@ export function createHud({ onShop, onPlot, onSpin, onCollectAll, onAutoSwing, o
       const b = spin.querySelector('.badge')
       b.textContent = n
       b.hidden = n <= 0
+    },
+    // The FREE! car button: { left (s), ready, claimed } from game/freecar.js. Gone once claimed.
+    setFreeCar({ left, ready, claimed }) {
+      free.hidden = claimed
+      free.classList.toggle('ready', ready)
+      free.querySelector('.badge').hidden = !ready
+      const s = Math.max(0, left)
+      free.querySelector('.name').textContent = ready ? 'FREE!' : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
     },
     setDailyReady(on) {
       daily.querySelector('.badge').hidden = !on

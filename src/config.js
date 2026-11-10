@@ -145,7 +145,6 @@ export const CARS = {
 // Placeholder HUD state for the parts that have no game rules yet (spins, offers).
 export const HUD_DEMO = {
   spins: 1,
-  freeCar: 'blueCoupe',
   offers: { starterPack: 19, opPickaxe: 159 },
 }
 // --- Game rules (game/*.js): buy a block off the belt, carry it into the garage,
@@ -318,6 +317,15 @@ export const DAILY = {
     { kind: 'car', rarity: 'Mythic', name: 'Inferno', look: 'omega' },
     { kind: 'car', rarity: 'Secret', name: 'Solar GT', look: 'orangeHyper', bonus: 3, op: true },
   ],
+}
+// The HUD's FREE! car (game/freecar.js): play `minutes` and claim it, once. A guest's play time is
+// counted in this browser (saveKey, only while the tab is visible); a signed-in player's on the game
+// server (backend freeCar.ts, FREE_CAR_SECONDS = minutes x 60), which also allows one claim per account.
+// `car` is made like a Daily Rewards car (`bonus` x its rarity's income).
+export const FREE_CAR = {
+  saveKey: 'break-for-cars:freecar:v1',
+  minutes: 30,
+  car: { rarity: 'Legendary', name: 'Blaze', look: 'orangeHyper', bonus: 1.5 },
 }
 // Car variants ("mutations"). A block bought during an event can carry the event's
 // variant; the car inside earns `mult` x a Normal one. Shown on the block (tint +

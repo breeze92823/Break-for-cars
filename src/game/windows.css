@@ -15,6 +15,95 @@
   filter: saturate(0.35) brightness(0.85);
 }
 
+.pick-head.win-green {
+  border-color: #116b0c;
+  background-color: #49e43a;
+  box-shadow: inset 0 0 0 calc(var(--s) * 0.4) #b6ffa8, inset 0 calc(var(--s) * -1) 0 rgba(0, 0, 0, 0.15);
+}
+
+/* --- Free Car (game/freecar.js) ----------------------------------------------------------------- */
+.free-win {
+  width: min(100%, max(320px, calc(var(--s) * 74)));
+}
+.free-body {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--s) * 2.4);
+  padding: calc(var(--s) * 2.6) calc(var(--s) * 2.4);
+}
+.free-card {
+  --stud: calc(var(--s) * 2.3);
+  flex: none;
+  width: max(140px, calc(var(--s) * 28));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--s) * 0.4);
+  padding: calc(var(--s) * 1) calc(var(--s) * 0.6) calc(var(--s) * 1.2);
+  border: calc(var(--s) * 0.45) solid #3a0d6a;
+  border-radius: calc(var(--s) * 1.4);
+  background-color: #b43cff;
+  box-shadow: inset 0 0 0 calc(var(--s) * 0.45) #e3a8ff, 0 0 0 calc(var(--s) * 0.25) #0d0f17;
+}
+.fc-kind {
+  font-size: max(16px, calc(var(--s) * 4));
+}
+.fc-pic {
+  width: 100%;
+  height: max(70px, calc(var(--s) * 14));
+  object-fit: contain;
+}
+.fc-name {
+  font-size: max(18px, calc(var(--s) * 4.4));
+}
+.fc-income {
+  font-size: max(16px, calc(var(--s) * 3.8));
+  color: #ffe14a;
+}
+.free-side {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--s) * 2);
+}
+.free-sub {
+  text-align: center;
+  font-size: max(16px, calc(var(--s) * 3.8));
+}
+.free-bar {
+  position: relative;
+  width: 100%;
+  height: max(30px, calc(var(--s) * 6));
+  border: calc(var(--s) * 0.45) solid #0d0f17;
+  border-radius: calc(var(--s) * 3);
+  background: #181b28;
+  overflow: hidden;
+}
+.free-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: linear-gradient(#7dff6a, #2fb52a);
+  transition: width 0.4s linear;
+}
+.free-time {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: max(15px, calc(var(--s) * 3.4));
+  font-variant-numeric: tabular-nums;
+}
+.free-go {
+  width: max(150px, calc(var(--s) * 30));
+  font-variant-numeric: tabular-nums;
+}
+.free-go.claim {
+  animation: win-glow 0.9s ease-in-out infinite alternate;
+}
+
 /* --- Fuse Machine ----------------------------------------------------------------------------- */
 .fuse-win {
   width: min(100%, max(320px, calc(var(--s) * 80)));
@@ -538,6 +627,11 @@
 
 /* Phone portrait: tighter grids. */
 @media (max-width: 520px) {
+  .free-body {
+    flex-direction: column;
+    padding: 14px 10px;
+    gap: 12px;
+  }
   .fuse-slots {
     gap: 6px;
   }

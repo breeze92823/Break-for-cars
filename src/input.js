@@ -1,6 +1,6 @@
 // Keyboard + mouse. WASD/arrows move (camera-relative, consumed by player.js),
-// mouse look by dragging (left or right button; the cursor stays free so clicks
-// can hit things in the world) and wheel
+// mouse look while pointer-locked (click grabs, Esc releases; drag where it is
+// refused or not yet granted) and wheel
 // zoom (consumed by camera.js), edge-triggered actions cleared by their consumer.
 // Touch controls (touch.js) write look/zoom/jump directly and move/sprint via
 // setTouchMove/setTouchSprint, which are merged with the keys here.
@@ -84,9 +84,13 @@ export function install(showMenu, canvasEl) {
   window.addEventListener('pointerdown', (e) => {
     const onWorld = e.target === canvas
     if (e.button === 2 && !isLocked()) orbiting = true
-    // A left click on the world is a game action (swing, upgrade button: game/), so it
-    // keeps the cursor free; dragging with either button turns the camera.
-    if (e.button === 0 && onWorld && e.pointerType === 'mouse' && !isLocked()) orbiting = true
+    // A click on the world grabs the cursor (pointer lock; Esc gives it back). The click is still
+    // a game action (swing / upgrade). Until the lock lands (or where it is refused) the drag
+    // turns the camera instead. Never on touch: there is no cursor.
+    if (e.button === 0 && onWorld && e.pointerType === 'mouse') {
+      requestLock()
+      if (!isLocked()) orbiting = true
+    }
   })
   window.addEventListener('pointerup', (e) => {
     if (e.button === 0 || e.button === 2) orbiting = false

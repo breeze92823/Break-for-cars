@@ -259,7 +259,7 @@ export function createFuse(layer, { inv, hud, sfx, onClaim }) {
     if (!open) return
     open = false
     root.classList.remove('show')
-    sfx.blip()
+    sfx.close()
   }
   $('.pick-x').addEventListener('click', hide)
   $('.fuse-back').addEventListener('click', closePicker)

@@ -171,7 +171,7 @@ export function createTrade(layer, { inv, hud, sfx, income, beforeOpen, onDone }
   function closePicker() {
     picker.hidden = true
   }
-  $('.trade-pick .pick-x').addEventListener('click', () => (sfx.blip(), closePicker()))
+  $('.trade-pick .pick-x').addEventListener('click', () => (sfx.close(), closePicker()))
   pickList.addEventListener('wheel', (e) => e.stopPropagation(), { passive: true })
 
   // --- Offer ---------------------------------------------------------------------------------------
@@ -232,7 +232,7 @@ export function createTrade(layer, { inv, hud, sfx, income, beforeOpen, onDone }
     tradeCancel()
     returnAll()
     closeWindow()
-    sfx.blip()
+    sfx.close()
   }
   $('.trade-decline').addEventListener('click', decline)
   acceptBtn.addEventListener('click', () => {

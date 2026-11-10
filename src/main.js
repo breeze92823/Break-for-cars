@@ -21,11 +21,12 @@ import { applyProportions, attachEquippedAccessories } from './avatar/loader.js'
 import { disposeAnimator, makeAnimator } from './avatar/animator.js'
 import { createGame } from './game/game.js'
 import * as sfx from './game/audio.js'
+import { updateMoveSounds } from './game/movesfx.js'
 import { setMusic, setMusicVolume } from './game/music.js'
 import { gameSettings, onGameSettings } from './game/settings.js'
 import { playEmote } from './avatar/emotes.js'
 import { createBubble } from './bubble.js'
-import { initNet, myPlot, net, sendEmote, sendSwing, sendTutorial, verifyAdReward } from './net.js'
+import { claimFreeCar, initNet, myPlot, net, sendEmote, sendSwing, sendTutorial, verifyAdReward } from './net.js'
 import { createRemotePlayers } from './remotePlayers.js'
 import { createRemoteBases } from './remoteBases.js'
 import { LEADERBOARDS, NET } from './config.js'
@@ -204,6 +205,7 @@ const hud = createHud({
   onDaily: () => game?.toggleDaily(),
   onSettings: () => game?.toggleSettings(),
   onIndex: () => game?.toggleIndex(),
+  onFreeCar: () => game?.toggleFreeCar(),
 })
 for (const b of lobby.bases) b.onAnnounce((msg) => b === game?.base && hud.announce(msg))
 
@@ -223,6 +225,7 @@ for (const b of lobby.bases) b.onAnnounce((msg) => b === game?.base && hud.annou
     lobby, // the event system drives the "Next Event" board
     onSwing: sendSwing,
     onTutorialStep: sendTutorial, // saved for the account (backend tutorial.ts)
+    claimFreeCar: () => (net.connected ? claimFreeCar() : Promise.resolve(null)), // checked by the server (backend freeCar.ts)
     nearbyPlayer: () => remotePlayers?.nearest(player.position, 4.5),
     rewardedAd: {
       available: () => net.connected && bloxity.canShowRewarded(),
@@ -249,6 +252,8 @@ initNet({
   plot: () => game.base.index,
   tutorial: () => game.tutorialStep,
   onTutorial: (step) => game.syncTutorial(step),
+  freeCar: () => game.freeCarSnapshot(),
+  onFreeCar: (msg) => game.syncFreeCar(msg),
 })
 // The server hands out the garages: move the game (and us, when we were home) to ours.
 function followPlot(plot) {
@@ -289,8 +294,8 @@ const onZone = (zone) => {
 onModeChanged((mode) => {
   playerGroup.visible = mode !== 'player' // first person: you are the camera
 })
-onKey('KeyV', toggleMode)
-onKey('KeyN', () => lighting.toggleDayNight())
+onKey('KeyV', () => (sfx.click(), toggleMode()))
+onKey('KeyN', () => (sfx.click(), lighting.toggleDayNight()))
 onKey('KeyR', respawn)
 // Escape opens Bloxity's own menu (input.js); P is Bloxity's pause key on CrazyGames: never bound here.
 installTouch({ mode: toggleMode, day: () => lighting.toggleDayNight(), respawn, hit: () => game?.swing() })
@@ -320,6 +325,7 @@ function frame(stepDt) {
 
   stepPhysics(dt) // runs the player controller + world at the fixed rate, interpolates bodies
   interpolatePlayer()
+  updateMoveSounds(dt) // footsteps, jump, landing, respawn
 
   const p = player.renderPosition
   playerGroup.position.set(p.x, p.y, p.z)

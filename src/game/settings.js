@@ -89,7 +89,7 @@ export function createSettings(layer, { sfx, hud }) {
     if (!open) return
     open = false
     root.classList.remove('show')
-    sfx.blip()
+    sfx.close()
   }
   root.querySelector('.pick-x').addEventListener('click', hide)
   return { open: show, close: hide, toggle: () => (open ? hide() : show()) }

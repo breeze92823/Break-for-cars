@@ -45,6 +45,7 @@ import { createPickShop } from './pickshop.js'
 import { createSellShop } from './sellshop.js'
 import { createFuse } from './fuse.js'
 import { createDaily } from './daily.js'
+import { createFreeCar } from './freecar.js'
 import { createEvents } from './events.js'
 import { createIndex } from './carindex.js'
 import { createSpin } from './spin.js'
@@ -102,7 +103,7 @@ function spriteOf(canvas, height) {
 // onSwing(): a swing started (relayed so the others see it).
 // rewardedAd: { available(), watch() } for the Spin Wheel's "Watch Ad" button (spin.js).
 // onTutorialStep(step): the new-player tutorial moved on (net.js saves it for the account).
-export function createGame({ scene, camera, canvas, base, bursts, hud, playerGroup, playerFx, getAvatar, getAnimator, lobby, onSwing, rewardedAd, nearbyPlayer, onTutorialStep }) {
+export function createGame({ scene, camera, canvas, base, bursts, hud, playerGroup, playerFx, getAvatar, getAnimator, lobby, onSwing, rewardedAd, nearbyPlayer, onTutorialStep, claimFreeCar }) {
   let g = base.group
   g.updateMatrixWorld(true)
   base.setLit(true)
@@ -586,6 +587,7 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
         state.held = -1
         state.equipped = true
       } else state.equipped = !state.equipped
+      sfx.equip(state.equipped)
       showCarry()
     } else if (entry.kind === 'car') {
       if (state.carrying) return fail('Place your block on a free bay first')
@@ -1032,7 +1034,7 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
   const sellShop = createSellShop(layer, {
     cars: () => state.cars.map((c) => ({ name: c.name, rarity: c.rarity, look: c.look, value: sellValue(c) })),
     onSell: sellCarAt,
-    onClose: () => sfx.blip(),
+    onClose: () => sfx.close(),
   })
 
   // --- Hotbar access for the Fuse Machine and Daily Rewards (game/fuse.js, daily.js) -------------------
@@ -1080,9 +1082,22 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
     },
   })
   const daily = createDaily(layer, { inv, hud, sfx, onReady: (on) => hud.setDailyReady?.(on), onClaim: () => cheer('#ffe14a') })
+  // The HUD's FREE! car after FREE_CAR.minutes of play (a signed-in player's checked by the server).
+  const freeCar = createFreeCar(layer, {
+    inv,
+    hud,
+    sfx,
+    claimRemote: () => claimFreeCar?.() ?? Promise.resolve(null),
+    onState: (s) => hud.setFreeCar?.(s),
+    onClaim: (car) => {
+      cheer(RARITY_COLORS[car.rarity] ?? '#ffffff')
+      sfx.reveal(tierOf(car.rarity))
+      showReveal(car, false)
+    },
+  })
   // One window at a time: opening one closes the rest (pickShop is added below).
   const settings = createSettings(layer, { sfx, hud })
-  const windows = [sellShop, fuseMachine, daily, carIndex, settings]
+  const windows = [sellShop, fuseMachine, daily, freeCar, carIndex, settings]
   const events = createEvents(layer, { lobby, base, hud, sfx })
   const spinWheel = createSpin(layer, {
     inv,
@@ -1111,7 +1126,7 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
     equipped: () => state.pickaxe,
     onBuy: buyPickaxe,
     onEquip: (id) => equipPickaxe(id, false),
-    onClose: () => sfx.blip(),
+    onClose: () => sfx.close(),
   })
   windows.push(pickShop)
   const baseSkins = createBaseSkins(layer, {
@@ -1121,7 +1136,7 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
     onBuy: buySkin,
     onEquip: (id) => equipSkin(id, false),
     onLocked: (sk) => fail(`Get ${Math.round(sk.index * 100)}% of the Index to unlock ${sk.name}, or buy it for $${short(sk.price)}`),
-    onClose: () => sfx.blip(),
+    onClose: () => sfx.close(),
   })
   windows.push(baseSkins)
   const trade = createTrade(layer, {
@@ -1156,6 +1171,11 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
   const raycaster = new Raycaster()
   const ndc = new Vector2()
   function act(x, y) {
+    if (document.pointerLockElement) {
+      // Cursor is captured: aim from the screen centre
+      x = window.innerWidth / 2
+      y = window.innerHeight / 2
+    }
     ndc.set((x / window.innerWidth) * 2 - 1, -(y / window.innerHeight) * 2 + 1)
     raycaster.setFromCamera(ndc, camera)
     const hit = raycaster.intersectObjects(signMeshes, false)[0]
@@ -1589,6 +1609,10 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
     swing,
     // HUD calendar / gear buttons.
     toggleDaily: () => (solo(daily), daily.toggle()),
+    toggleFreeCar: () => (solo(freeCar), freeCar.toggle()),
+    // The free car's play time: what this browser counted (net.js freeCarSync) / the server's answer.
+    freeCarSnapshot: () => freeCar.snapshot(),
+    syncFreeCar: (msg) => freeCar.sync(msg),
     toggleSettings: () => (solo(settings), settings.toggle()),
     toggleIndex: () => (solo(carIndex), carIndex.toggle()),
     toggleSpin: () => (solo(spinWheel), spinWheel.toggle()),

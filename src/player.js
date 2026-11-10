@@ -17,6 +17,8 @@ export const player = {
   grounded: true,
   facing: SPAWN_FACING, // yaw the character model faces, radians
   dims: { ...PLAYER_DIMS },
+  jumps: 0, // counts up on every jump (game/movesfx.js plays the push-off)
+  respawns: 0, // counts up on every respawn
 }
 
 const HALF = PLAYER_DIMS.height / 2 // capsule centre above the feet
@@ -67,6 +69,7 @@ export function setHome(x, z, facing) {
 export function respawn() {
   resetPlayer(home.spawn, home.facing)
   syncYawToPlayer()
+  player.respawns++
 }
 
 const TAU = Math.PI * 2
@@ -125,6 +128,7 @@ function step(dt) {
     jumpQueued = 0
     sinceGrounded = PHYSICS.coyoteTime + 1
     jumped = true
+    player.jumps++
   }
   jumpQueued = Math.max(0, jumpQueued - dt)
 

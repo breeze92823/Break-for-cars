@@ -92,7 +92,7 @@ export function createIndex(layer, { sfx }) {
     if (!open) return
     open = false
     root.classList.remove('show')
-    sfx.blip()
+    sfx.close()
   }
   root.querySelector('.pick-x').addEventListener('click', hide)
   grid.addEventListener('wheel', (e) => e.stopPropagation(), { passive: true })

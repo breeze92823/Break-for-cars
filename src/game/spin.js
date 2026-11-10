@@ -179,12 +179,13 @@ export function createSpin(layer, { inv, income, giveBlock, hud, sfx, onWin, rew
     paintFoot()
     wheel.style.transition = `transform ${W.spinTime}s cubic-bezier(0.12, 0.8, 0.18, 1)`
     wheel.style.transform = `rotate(${angle}deg)`
-    sfx.blip()
-    let ticks = 0
-    const ticker = setInterval(() => {
-      if (++ticks > 18) return clearInterval(ticker)
-      sfx.blip()
-    }, (W.spinTime * 1000) / 26)
+    sfx.click()
+    // Ratchet clicks that slow down with the wheel (its ease-out is close to 1 - (1 - t)^3.5).
+    const TICKS = 36
+    for (let k = 1; k < TICKS; k++) {
+      const t = 1 - Math.pow(1 - k / TICKS, 1 / 3.5)
+      setTimeout(sfx.tick, t * W.spinTime * 1000)
+    }
     setTimeout(() => {
       spinning = false
       payout(r, i, amount)

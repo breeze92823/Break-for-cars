@@ -84,7 +84,14 @@ export function createTutorial({ layer, scene, sfx, onStep }) {
     const row = document.querySelector('.hud .hud-top')?.getBoundingClientRect()
     if (!row || !row.height) return
     const gap = Math.max(8, Math.min(window.innerHeight * 0.016, 18))
-    banner.style.top = `${Math.round(row.bottom + gap)}px`
+    // Phone portrait: the row is a column on the right and the left tiles sit beside it,
+    // so the banner goes under whichever ends lower.
+    let bottom = row.bottom
+    if (window.matchMedia('(max-width: 520px)').matches) {
+      const tiles = document.querySelector('.hud .hud-left')?.getBoundingClientRect()
+      if (tiles?.height) bottom = Math.max(bottom, tiles.bottom)
+    }
+    banner.style.top = `${Math.round(bottom + gap)}px`
   }
   window.addEventListener('resize', () => requestAnimationFrame(placeBanner))
   let shownText = ''

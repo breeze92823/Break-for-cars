@@ -10,6 +10,8 @@
 // from here. Scores go to the server, which reports them to Bloxity's boards under that verified id.
 // The new-player tutorial's step is the one thing the server keeps per account (backend tutorial.ts):
 // asked for once joined (`tutorialSync`), answered with `tutorial` { step }, raised by `tutorial`.
+// The free car's play time / claim for a signed-in player (backend freeCar.ts): `freeCarSync` once
+// joined, answered with `freeCar`; `freeCarClaim` answered with `freeCarClaim`.
 // Never throws and never blocks play: without a server the game runs alone on the home garage.
 import { Client } from '@colyseus/sdk'
 import { DEV_MODE, LOBBY, NET, SERVER_URL } from './config.js'
@@ -46,6 +48,8 @@ const hooks = {
   plot: () => LOBBY.homePlot, // the garage played on now (asked for again on every join)
   tutorial: () => 0, // the tutorial step reached in this browser (game.tutorialStep)
   onTutorial: () => {}, // (step) the server's step for this account (game.syncTutorial)
+  freeCar: () => null, // { played, claimed } this browser counted for the free car (game.freeCarSnapshot)
+  onFreeCar: () => {}, // (msg) the server's `freeCar` { tracked, played, claimed, need } (game.syncFreeCar)
 }
 
 function send(type, payload) {
@@ -94,6 +98,26 @@ export const sendEmote = (id) => net.connected && send('emote', { id })
 // --- Tutorial (backend tutorial.ts; client game/tutorial.js) -------------------------------------------
 // A new step is sent at once; one reached offline goes up with the next join's `tutorialSync`.
 export const sendTutorial = (step) => net.connected && send('tutorial', { step })
+
+// --- Free car (backend freeCar.ts; client game/freecar.js) --------------------------------------
+// A signed-in player's play time is counted by the server, which also checks the one claim per account.
+// Resolves { ok, reason?: 'guest' | 'early' | 'claimed', played? }, or null when the server did not answer.
+let freeCarWaiting = null
+export function claimFreeCar() {
+  return new Promise((resolve) => {
+    if (!net.connected || freeCarWaiting) return resolve(null)
+    const timer = setTimeout(() => {
+      freeCarWaiting = null
+      resolve(null)
+    }, 10000)
+    freeCarWaiting = (msg) => {
+      clearTimeout(timer)
+      freeCarWaiting = null
+      resolve(msg ?? null)
+    }
+    send('freeCarClaim', {})
+  })
+}
 
 // --- Trades (backend trades.ts; client game/trade.js) ------------------------------------------
 // The server brokers requests, offers and accepts; the game swaps the cars. Server messages reach the
@@ -163,6 +187,9 @@ function attach(room, relay) {
   room.onMessage('adReward', (m) => adWaiting?.(m))
   room.onMessage('tutorial', (m) => Number.isFinite(m?.step) && hooks.onTutorial(m.step))
   send('tutorialSync', { step: hooks.tutorial() })
+  room.onMessage('freeCar', (m) => hooks.onFreeCar(m))
+  room.onMessage('freeCarClaim', (m) => freeCarWaiting?.(m))
+  send('freeCarSync', hooks.freeCar() ?? {})
   for (const type of TRADE_EVENTS) room.onMessage(type, (m) => tradeHandler?.(type, m))
   room.onLeave(() => {
     if (net.room !== room) return
@@ -170,6 +197,8 @@ function attach(room, relay) {
     net.connected = false
     known = null
     tradeHandler?.('tradeEnd', { reason: 'offline' })
+    freeCarWaiting?.(null)
+    hooks.onFreeCar({ tracked: false }) // offline: the browser counts again
     updateRoom('')
     // An unexpected close (a pod being replaced, a network drop): resolve again and rejoin.
     setTimeout(connect, NET.retry * 1000)
@@ -247,7 +276,7 @@ function tick() {
   }
 }
 
-// pose(), loadout(), base(), stats(), plot(), tutorial(), onTutorial(step): see `hooks`.
+// pose(), loadout(), base(), stats(), plot(), tutorial(), onTutorial(step), freeCar(), onFreeCar(msg): see `hooks`.
 export function initNet(fns = {}) {
   Object.assign(hooks, fns)
   if (!hasServer()) return console.info('[net] no server configured; playing alone')

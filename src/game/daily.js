@@ -155,7 +155,7 @@ export function createDaily(layer, { inv, hud, sfx, onReady, onClaim }) {
     if (!open) return
     open = false
     root.classList.remove('show')
-    sfx.blip()
+    sfx.close()
   }
   root.querySelector('.pick-x').addEventListener('click', hide)
   return {

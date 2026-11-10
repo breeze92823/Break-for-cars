@@ -278,6 +278,23 @@
   color: #6dff3a;
   font-size: max(14px, calc(var(--s) * 3.4));
 }
+.free-btn:not(.ready) .name {
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+.free-btn:not(.ready) .rays {
+  opacity: 0.35;
+}
+.free-btn.ready img {
+  animation: hud-bob 0.9s ease-in-out infinite;
+}
+.free-btn .badge {
+  top: -2%;
+  right: -4%;
+}
+.free-btn[hidden] {
+  display: none;
+}
 @keyframes hud-bob {
   50% {
     transform: translateY(calc(var(--s) * -0.6)) rotate(-3deg);
@@ -582,26 +599,111 @@
 .touch-ui .hud-topright {
   right: calc(var(--safe-r) + 132px);
 }
-/* Phone portrait: the top row is the full width, the spin wheel drops under it. */
+/* Phone landscape with touch controls: the joystick owns the bottom-left and the
+   jump / run / hit cluster the bottom-right, so nothing tappable sits in either.
+   To Shop / To Plot keep the top row (narrower, so it fits between Bloxity's toolbar
+   and the touch layer's corner buttons); spin wheel, calendar and settings make one
+   row under those corner buttons, Index / FREE! / Auto Swing a second row under it,
+   both well above the thumb cluster; the money moves up under the chat. */
+@media (max-height: 520px) {
+  .touch-ui .lego-btn {
+    width: clamp(80px, 12vw, 97px);
+    font-size: clamp(16px, 2.6vw, 20px);
+  }
+  .touch-ui .spin-btn {
+    position: fixed; /* out of the top row, into the right-hand block */
+    top: calc(var(--safe-t) + 64px);
+    right: calc(var(--safe-r) + 112px);
+    width: 44px;
+    height: 44px;
+    margin: 0;
+  }
+  .touch-ui .spin-btn .strap {
+    display: none;
+  }
+  .touch-ui .hud .hud-topright {
+    top: calc(var(--safe-t) + 64px);
+    left: auto;
+    right: calc(var(--safe-r) + 12px);
+    gap: 6px;
+  }
+  .touch-ui .hud-left {
+    left: auto;
+    right: calc(var(--safe-r) + 12px);
+    top: calc(var(--safe-t) + 114px);
+  }
+  .touch-ui .hud-money {
+    bottom: auto;
+    top: max(calc(var(--safe-t) + 60px), calc(var(--reserved-left) + 6px));
+    left: calc(var(--safe-l) + 12px);
+  }
+  .hud-toast {
+    width: max-content;
+    max-width: min(56vw, 440px);
+    white-space: normal;
+    text-align: center;
+    line-height: 1.15;
+  }
+}
+/* Phone portrait: Bloxity's toolbar + chat fill the top-left, so To Shop / To Plot
+   stack in the strip right of the chat (hud.js right-aligns the column, under the
+   touch layer's corner buttons) with the spin wheel under them, and Index / FREE! /
+   Auto Swing become one short row right under the chat. Everything stays in the
+   top third, off the player in the middle of the screen. */
 @media (max-width: 520px) {
   .hud-top {
-    flex-wrap: wrap;
-    justify-content: center;
-    width: calc(100vw - 24px);
+    --base-top: calc(var(--safe-t) + 64px);
+    flex-direction: column;
+    align-items: stretch;
     gap: 8px;
   }
   .lego-btn {
-    width: 44%;
-    font-size: 19px;
+    width: clamp(76px, 24vw, 112px);
+    height: 44px;
+    font-size: clamp(15px, 4.3vw, 18px);
   }
   .spin-btn {
     position: absolute;
+    left: 0;
     right: 0;
     top: calc(100% + 10px);
-    margin: 0;
+    margin: 0 auto;
   }
   .spin-btn .strap {
     display: none;
+  }
+  .hud-left {
+    left: calc(var(--safe-l) + 12px);
+    top: max(calc(var(--safe-t) + 64px), calc(var(--reserved-left) + 10px));
+    grid-template-columns: 46px 46px auto;
+    gap: 6px;
+  }
+  .hud-left .tile,
+  .hud-left .free-btn {
+    width: 46px;
+    height: 46px;
+  }
+  .hud-left .wide-btn {
+    grid-column: auto;
+    height: 46px;
+    padding: 0 10px 0 6px;
+    font-size: 14px;
+  }
+  .hud-left .wide-btn svg {
+    width: 26px;
+    height: 26px;
+  }
+  /* toasts and announcements under that row, not over the chat */
+  .hud-toast {
+    top: calc(max(var(--safe-t) + 64px, var(--reserved-left) + 10px) + 60px);
+    width: max-content;
+    max-width: calc(100vw - 32px);
+    white-space: normal;
+    text-align: center;
+    line-height: 1.15;
+  }
+  .hud-banner {
+    top: calc(max(var(--safe-t) + 64px, var(--reserved-left) + 10px) + 56px);
   }
   .hud-right {
     top: auto;
