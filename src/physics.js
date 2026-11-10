@@ -126,4 +126,16 @@ export function segmentClear(ax, ay, az, bx, by, bz) {
   return (hit.timeOfImpact ?? hit.toi) / len
 }
 
+// Height of the first fixed surface straight below (x, fromY, z) within `depth` m, or null.
+let downRay = null
+export function groundBelow(x, fromY, z, depth = 4) {
+  if (!world) return null
+  downRay ??= new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 })
+  downRay.origin.x = x
+  downRay.origin.y = fromY
+  downRay.origin.z = z
+  const hit = world.castRay(downRay, depth, true, STATIC_ONLY())
+  return hit ? fromY - (hit.timeOfImpact ?? hit.toi) : null
+}
+
 export const bodyCount = () => (world ? world.bodies.len() : 0)

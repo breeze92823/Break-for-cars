@@ -1,6 +1,6 @@
 import { Group } from 'three'
 import { LOBBY } from '../config.js'
-import { buildGround } from './ground.js'
+import { buildGround, updateBelts } from './ground.js'
 import { buildNature } from './nature.js'
 import { buildLeaderboards } from './leaderboards.js'
 import { buildSouthPlaza } from './southplaza.js'
@@ -52,6 +52,7 @@ export function buildLobby(scene, preset) {
     // nightTarget: 0/1 from lighting.isNight(); onZone(zone|null) fires when the player enters/leaves a ring.
     update(dt, elapsed, playerPos, nightTarget, onZone) {
       updateFields(elapsed)
+      updateBelts(dt)
       bursts.update(dt)
       pollen.position.set(playerPos.x, 0, playerPos.z)
       night += (nightTarget - night) * Math.min(1, dt * 1.5)

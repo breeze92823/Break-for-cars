@@ -8,6 +8,7 @@ import {
   MeshStandardMaterial,
   PlaneGeometry,
   PointLight,
+  Quaternion,
   RepeatWrapping,
   SphereGeometry,
   TorusGeometry,
@@ -16,9 +17,9 @@ import {
   SpriteMaterial,
   SRGBColorSpace,
 } from 'three'
-import { BASE, BLOCK_THEMES, CONVEYOR_SKINS, LOBBY, MUTATIONS, RARITY_COLORS } from '../config.js'
+import { BASE, BLOCK_THEMES, CONVEYOR_SKINS, GARAGE_SKINS, LOBBY, MUTATIONS, RARITY_COLORS } from '../config.js'
 import { boxSpan, brick, plastic } from '../lego.js'
-import { fontReady, neon, solidBox } from '../propkit.js'
+import { fontReady, neon, solidBox, solidBoxQ } from '../propkit.js'
 import { mulberry32 } from '../textures.js'
 import { bakeMeshes } from '../bake.js'
 import { buildCar } from './cars.js'
@@ -34,6 +35,13 @@ import { sparkleField } from './fx.js'
 //    recess, and the owner's billboard on the front edge ("<name>'s Car Garage,
 //    $x/s"). Inside: a studded floor with five parking bays a side and a bright
 //    green collect pad by each bay along the centre aisle, ceiling light panels.
+//  - Floors (BASE.floors, setFloors): each bought floor stacks another storey with its own
+//    ten bays; a lego staircase climbs to it along the open front (alternating sides, glass
+//    rails, a stairwell with a guard rail in the floor above). The roof and billboard ride on
+//    the top floor; a glowing "[Upgrade] 2nd Floor" plate marks where the next stair goes.
+//    A floor not bought is hidden and its colliders are off.
+//  - Skin (GARAGE_SKINS, setSkin): recolours the frame, truss, slabs, glass and bays (the
+//    garage owns those materials); the rainbow one cycles its hues.
 //  - Apron: grey studded concrete in front of the garage.
 //  - Conveyor: a sunken dark belt with moving chevrons between low studded walls,
 //    a tunnel box at each end. Mystery blocks ride it from the entry tunnel to the
@@ -86,6 +94,9 @@ export function buildBase(scene, plot, bursts) {
   const B = BASE.building
   const H = B.height
   const F = B.floor
+  const S = H // storey height (garage units): floor n stands n * S up
+  const ST = BASE.stairs
+  const FLOORS = BASE.floors
   const g = new Group()
   g.name = 'playerBase'
   // Face the road: west plots turn +Z to +X, east plots to -X.
@@ -98,29 +109,63 @@ export function buildBase(scene, plot, bursts) {
   // The garage is drawn at its design size (BASE.building) inside its own group,
   // scaled by BASE.garageScale and pushed back by garageOffsetZ; `into(garage)`
   // makes box/solid/add work in that frame (colliders are scaled to match).
+  // Each floor is a group in the garage (`into(level, { ly })`: ly = its height in
+  // garage units, added to the colliders); `sink` collects a floor's colliders so
+  // they can be switched off while the floor is not bought.
   const garage = new Group()
   garage.scale.setScalar(BASE.garageScale)
   garage.position.z = BASE.garageOffsetZ
   g.add(garage)
+  const gs = BASE.garageScale
   let parent = g
   let k = 1
   let oz = 0
-  const into = (target) => {
+  let ly = 0
+  let sink = null
+  const into = (target, { inGarage = target === garage, y = 0, colliders = null } = {}) => {
     parent = target
-    k = target === garage ? BASE.garageScale : 1
-    oz = target === garage ? BASE.garageOffsetZ : 0
+    k = inGarage ? gs : 1
+    oz = inGarage ? BASE.garageOffsetZ : 0
+    ly = y
+    sink = colliders
   }
   // Collider for a local axis-aligned box.
   const solid = (x0, y0, z0, x1, y1, z1) => {
     const [wx, wz] = toWorld(((x0 + x1) / 2) * k, ((z0 + z1) / 2) * k + oz)
-    solidBox((Math.abs(x1 - x0) / 2) * k, (Math.abs(y1 - y0) / 2) * k, (Math.abs(z1 - z0) / 2) * k, wx, ((y0 + y1) / 2) * k, wz, yaw)
+    const c = solidBox((Math.abs(x1 - x0) / 2) * k, (Math.abs(y1 - y0) / 2) * k, (Math.abs(z1 - z0) / 2) * k, wx, ((y0 + y1) / 2 + ly) * k, wz, yaw)
+    sink?.push(c)
+    return c
+  }
+  // Collider for a garage-frame box tilted by theta about the garage Z axis (stair ramps, rails).
+  const qYaw = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), yaw)
+  const qTilt = new Quaternion()
+  const Z_AXIS = new Vector3(0, 0, 1)
+  const solidTilt = (cx, cy, cz, hx, hy, hz, theta) => {
+    const [wx, wz] = toWorld(cx * gs, cz * gs + BASE.garageOffsetZ)
+    const q = qTilt.setFromAxisAngle(Z_AXIS, theta).premultiply(qYaw)
+    const c = solidBoxQ(hx * gs, hy * gs, hz * gs, wx, (cy + ly) * gs, wz, { x: q.x, y: q.y, z: q.z, w: q.w })
+    sink?.push(c)
+    return c
   }
   const box = (mat, x0, y0, z0, x1, y1, z1, shadow = true) => boxSpan(parent, mat, x0, y0, z0, x1, y1, z1, { shadow })
   const add = (m) => parent.add(m)
+  // A box tilted by theta about Z (stair handrails and glass), centred at (cx, cy, cz).
+  const tilted = (mat, cx, cy, cz, lx, lyy, lz, theta, shadow = true) => {
+    const m = new Mesh(new BoxGeometry(lx, lyy, lz), mat)
+    m.position.set(cx, cy, cz)
+    m.rotation.z = theta
+    m.castShadow = shadow
+    m.receiveShadow = true
+    parent.add(m)
+    return m
+  }
 
   const concrete = brick(CONCRETE, { roughness: 0.6 })
   const concreteLight = brick(CONCRETE_LIGHT, { roughness: 0.6 })
-  const steel = brick(STEEL, { roughness: 0.55 })
+  // The garage's own materials (never shared with another garage): its skin recolours them (setSkin).
+  const skinFrame = brick(STEEL, { roughness: 0.55, unique: true }) // columns, fascia, rails
+  const skinSlab = brick(CONCRETE, { roughness: 0.6, unique: true }) // floors, stairs, roof
+  const skinRail = new MeshStandardMaterial({ color: STEEL, roughness: 0.5 }) // sloped handrails (no studs on a slope)
   const trussTex = new CanvasTexture(paintTruss())
   trussTex.colorSpace = SRGBColorSpace
   trussTex.wrapS = trussTex.wrapT = RepeatWrapping
@@ -134,7 +179,7 @@ export function buildBase(scene, plot, bursts) {
   const trussH = new MeshStandardMaterial({ map: trussHTex, roughness: 0.5 })
   const glass = new MeshPhysicalMaterial({ color: '#bdf1ff', metalness: 0.1, roughness: 0.05, transparent: true, opacity: 0.28, depthWrite: false, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.5 })
 
-  // --- Apron + garage floor ------------------------------------------------------------
+  // --- Apron + front step ----------------------------------------------------------------
   const A = BASE.apron
   box(concreteLight, A.minX, -0.2, A.minZ, A.maxX, 0.15, A.maxZ, false)
   solid(A.minX, 0, A.minZ, A.maxX, 0.15, A.maxZ)
@@ -144,64 +189,241 @@ export function buildBase(scene, plot, bursts) {
   box(dirt, A.minX - 1.2, -0.2, A.minZ - 1.0, A.minX, 0.12, A.maxZ, false)
   box(dirt, A.maxX, -0.2, A.minZ - 1.0, A.maxX + 1.2, 0.12, A.maxZ, false)
   // A step up to the scaled garage floor (each rise stays under the player's autostep).
-  const gs = BASE.garageScale
   const floorFront = (B.maxZ + 0.4) * gs + BASE.garageOffsetZ
   box(concrete, (B.minX - 0.6) * gs, 0, floorFront, (B.maxX + 0.6) * gs, (F * gs) / 2, floorFront + 1.4, false)
   solid((B.minX - 0.6) * gs, 0, floorFront, (B.maxX + 0.6) * gs, (F * gs) / 2, floorFront + 1.4)
 
   // ===== Garage (design size, scaled) =====
-  into(garage)
-  box(concrete, B.minX - 0.6, 0, B.minZ - 0.6, B.maxX + 0.6, F, B.maxZ + 0.4, false)
-  solid(B.minX - 0.6, 0, B.minZ - 0.6, B.maxX + 0.6, F, B.maxZ + 0.4)
-
-  // --- Garage frame -----------------------------------------------------------------------
+  const bayEdge = brick('#adb5d2', { roughness: 0.5, unique: true })
+  const bayTop = brick('#c4cbe2', { roughness: 0.45, unique: true })
+  const padMat = brick('#5cff24', { roughness: 0.4, emissive: '#3dff10', emissiveIntensity: 0.45 })
+  const upgradeMat = brick('#29d8ff', { roughness: 0.35, emissive: '#10b8ff', emissiveIntensity: 0.55 })
+  const upgradeEdge = brick('#1a8fd8', { roughness: 0.4 })
+  const panel = neon('#f2f8ff', 1.5)
   const colW = 0.9
-  const column = (x, z) => {
-    box(steel, x - colW / 2, F, z - colW / 2, x + colW / 2, H, z + colW / 2)
-    solid(x - colW / 2, F, z - colW / 2, x + colW / 2, H, z + colW / 2)
-  }
   const sideZ = [B.minZ, -15.8, -10.6, -5.4, -0.2, B.maxZ]
-  for (const z of sideZ) {
-    column(B.minX, z)
-    column(B.maxX, z)
+  const X0 = B.minX - 0.6
+  const X1 = B.maxX + 0.6
+  const Z0 = B.minZ - 0.6
+  const Z1 = B.maxZ + 0.4
+  // The staircase that climbs from floor n-1 to floor n (n >= 1): along the front strip, alternating sides.
+  const stairOf = (n) => {
+    const dir = n % 2 === 1 ? -1 : 1
+    const foot = dir * ST.gap
+    const top = dir * (ST.gap + ST.run)
+    return { dir, foot, top, x0: Math.min(foot, top), x1: Math.max(foot, top) }
   }
-  for (const x of [-6, 0, 6]) column(x, B.minZ)
+  const live = new Set() // meshes kept out of the bake (toggled or recoloured on their own)
+  const bays = [] // in garage design units (game/ places blocks and cars on them)
+  const levels = [] // per floor: { group, colliders }
 
-  // Glass walls (sides + back) with truss mullions: posts halfway between columns,
-  // a sill, a mid rail and a head rail.
-  const pane = (x0, z0, x1, z1) => {
-    const len = Math.hypot(x1 - x0, z1 - z0)
-    const m = new Mesh(new PlaneGeometry(len, H - F - 0.4), glass)
-    m.position.set((x0 + x1) / 2, (F + H) / 2, (z0 + z1) / 2)
-    m.rotation.y = x0 === x1 ? Math.PI / 2 : 0
-    m.renderOrder = 3
-    add(m)
-  }
-  const trussPost = (x, z) => {
-    box(trussV, x - 0.18, F, z - 0.18, x + 0.18, H, z + 0.18)
-  }
-  const railAlongZ = (x, y, z0, z1, t = 0.32) => box(trussH, x - 0.18, y - t / 2, z0, x + 0.18, y + t / 2, z1)
-  const railAlongX = (z, y, x0, x1, t = 0.32) => box(trussH, x0, y - t / 2, z - 0.18, x1, y + t / 2, z + 0.18)
-  for (const x of [B.minX, B.maxX]) {
-    pane(x, B.minZ, x, B.maxZ)
-    for (let i = 0; i < sideZ.length - 1; i++) trussPost(x, (sideZ[i] + sideZ[i + 1]) / 2)
-    railAlongZ(x, F + 0.25, B.minZ, B.maxZ, 0.5)
-    railAlongZ(x, (F + H) / 2 + 0.3, B.minZ, B.maxZ)
-    railAlongZ(x, H - 0.25, B.minZ, B.maxZ, 0.5)
-    solid(x - 0.25, F, B.minZ, x + 0.25, H, B.maxZ)
-  }
-  pane(B.minX, B.minZ, B.maxX, B.minZ)
-  for (const x of [-9, -3, 3, 9]) trussPost(x, B.minZ)
-  railAlongX(B.minZ, F + 0.25, B.minX, B.maxX, 0.5)
-  railAlongX(B.minZ, (F + H) / 2 + 0.3, B.minX, B.maxX)
-  railAlongX(B.minZ, H - 0.25, B.minX, B.maxX, 0.5)
-  solid(B.minX, F, B.minZ - 0.25, B.maxX, H, B.minZ + 0.25)
+  function buildLevel(n) {
+    const level = new Group()
+    level.name = `garageFloor${n}`
+    level.position.y = n * S
+    garage.add(level)
+    const colliders = []
+    into(level, { inGarage: true, y: n * S, colliders })
 
-  // --- Roof ---------------------------------------------------------------------------------
+    // --- Floor slab (an upper one has the stairwell of the stair coming up to it) ---
+    if (n === 0) {
+      box(skinSlab, X0, 0, Z0, X1, F, Z1, false)
+      solid(X0, 0, Z0, X1, F, Z1)
+    } else {
+      const st = stairOf(n)
+      for (const [a, b, c, d] of [[X0, Z0, X1, ST.z0], [X0, ST.z1, X1, Z1], [X0, ST.z0, st.x0, ST.z1], [st.x1, ST.z0, X1, ST.z1]]) {
+        if (c - a < 0.01 || d - b < 0.01) continue
+        box(skinSlab, a, 0, b, c, F, d)
+        solid(a, 0, b, c, F, d)
+      }
+      // Guard rail round the stairwell: along its back edge and its foot end (the top end
+      // stays open: that is where the stair arrives).
+      const railH = 1.1
+      const guard = (x0, z0, x1, z1) => {
+        const m = box(glass, x0, F, z0, x1, F + railH, z1, false)
+        m.renderOrder = 3
+        box(skinFrame, x0 - 0.02, F + railH, z0 - 0.02, x1 + 0.02, F + railH + 0.14, z1 + 0.02)
+        solid(x0, F, z0, x1, F + railH + 0.14, z1)
+      }
+      guard(st.x0, ST.z0 - 0.12, st.x1, ST.z0)
+      if (st.dir < 0) guard(st.foot, ST.z0 - 0.12, st.foot + 0.12, ST.z1)
+      else guard(st.foot - 0.12, ST.z0 - 0.12, st.foot, ST.z1)
+      // Front parapet: the upper floors are open at the front like the ground floor.
+      guard(B.minX, B.maxZ - 0.15, B.maxX, B.maxZ + 0.15)
+      // The stair itself (drawn with this floor, so it shows once the floor is bought).
+      buildStair(st, -S)
+    }
+
+    // --- Frame ---
+    const column = (x, z) => {
+      box(skinFrame, x - colW / 2, F, z - colW / 2, x + colW / 2, H, z + colW / 2)
+      solid(x - colW / 2, F, z - colW / 2, x + colW / 2, H, z + colW / 2)
+    }
+    for (const z of sideZ) {
+      column(B.minX, z)
+      column(B.maxX, z)
+    }
+    for (const x of [-6, 0, 6]) column(x, B.minZ)
+
+    // Glass walls (sides + back) with truss mullions: posts halfway between columns,
+    // a sill, a mid rail and a head rail.
+    const pane = (x0, z0, x1, z1) => {
+      const len = Math.hypot(x1 - x0, z1 - z0)
+      const m = new Mesh(new PlaneGeometry(len, H - F - 0.4), glass)
+      m.position.set((x0 + x1) / 2, (F + H) / 2, (z0 + z1) / 2)
+      m.rotation.y = x0 === x1 ? Math.PI / 2 : 0
+      m.renderOrder = 3
+      add(m)
+    }
+    const trussPost = (x, z) => box(trussV, x - 0.18, F, z - 0.18, x + 0.18, H, z + 0.18)
+    const railAlongZ = (x, y, z0, z1, t = 0.32) => box(trussH, x - 0.18, y - t / 2, z0, x + 0.18, y + t / 2, z1)
+    const railAlongX = (z, y, x0, x1, t = 0.32) => box(trussH, x0, y - t / 2, z - 0.18, x1, y + t / 2, z + 0.18)
+    for (const x of [B.minX, B.maxX]) {
+      pane(x, B.minZ, x, B.maxZ)
+      for (let i = 0; i < sideZ.length - 1; i++) trussPost(x, (sideZ[i] + sideZ[i + 1]) / 2)
+      railAlongZ(x, F + 0.25, B.minZ, B.maxZ, 0.5)
+      railAlongZ(x, (F + H) / 2 + 0.3, B.minZ, B.maxZ)
+      railAlongZ(x, H - 0.25, B.minZ, B.maxZ, 0.5)
+      solid(x - 0.25, F, B.minZ, x + 0.25, H, B.maxZ)
+    }
+    pane(B.minX, B.minZ, B.maxX, B.minZ)
+    for (const x of [-9, -3, 3, 9]) trussPost(x, B.minZ)
+    railAlongX(B.minZ, F + 0.25, B.minX, B.maxX, 0.5)
+    railAlongX(B.minZ, (F + H) / 2 + 0.3, B.minX, B.maxX)
+    railAlongX(B.minZ, H - 0.25, B.minX, B.maxX, 0.5)
+    solid(B.minX, F, B.minZ - 0.25, B.maxX, H, B.minZ + 0.25)
+    // ceiling light panels
+    for (const x of [-6, 6]) for (const z of [-16, -8, 0]) box(panel, x - 1.6, H - 0.08, z - 0.6, x + 1.6, H - 0.01, z + 0.6, false)
+
+    // --- Parking bays + green collect pads ---
+    const y = n * S // bay heights are in the garage frame (not this floor's)
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < BASE.slots; i++) {
+        const z = B.minZ + 3.2 + i * 4.6
+        const x0 = side < 0 ? B.minX + 0.9 : 4.6
+        const x1 = side < 0 ? -4.6 : B.maxX - 0.9
+        const edge = box(bayEdge, x0, F, z - 1.85, x1, F + 0.12, z + 1.85, false)
+        const top = box(bayTop, x0 + 0.3, F + 0.12, z - 1.55, x1 - 0.3, F + 0.17, z + 1.55, false)
+        const px = side * 3.4
+        const pad = box(padMat, px - 0.55, F, z - 1.1, px + 0.55, F + 0.16, z + 1.1, false)
+        const bay = { level: n, side, x0, x1, z0: z - 1.85, z1: z + 1.85, cx: (x0 + x1) / 2, cz: z, top: y + F + 0.17, pad: { x: px, z, hx: 0.55, hz: 1.1, top: y + F + 0.16, mesh: pad }, locked: null }
+        bays.push(bay)
+        const lock = BASE.lockedSlots.find((l) => l.bay === bays.length - 1)
+        if (lock) {
+          // Locked until bought: the bay and its pad are hidden; a glowing cyan studded
+          // plate with an "[Upgrade] / 10th Slot / $price" sign stands in its place.
+          edge.visible = top.visible = pad.visible = false
+          const plate = new Group()
+          const cx = bay.cx
+          boxSpan(plate, upgradeMat, cx - 1.3, F, z - 1.3, cx + 1.3, F + 0.18, z + 1.3, { shadow: false })
+          boxSpan(plate, upgradeEdge, cx - 1.45, F, z - 1.45, cx + 1.45, F + 0.1, z + 1.45, { shadow: false })
+          plate.add(sparkleField({ count: 22, center: { x: cx, y: F + 0.2, z }, box: { x: 1.2, y: 0.6, z: 1.2 }, rise: 0.55, life: 2, drift: 0.12, size: 0.13, color: '#5ff0ff', seed: 300 + bays.length }))
+          add(plate)
+          const sign = spriteFrom(
+            paintStack([
+              { size: 50, parts: [{ text: '[Upgrade]', fill: '#ffb21a' }] },
+              { size: 54, parts: [{ text: lock.label, fill: '#3ff0ff' }] },
+              { size: 54, parts: [{ text: '$' + short(lock.price), fill: '#7dff3a' }] },
+            ]),
+            1.25,
+          )
+          sign.position.set(cx, F + 2.0, z)
+          add(sign)
+          bay.locked = { price: lock.price, label: lock.label, meshes: [edge, top, pad], plate, sign }
+          for (const o of [edge, top, pad, plate]) live.add(o)
+        }
+      }
+    }
+    levels.push({ group: level, colliders })
+  }
+
+  // A staircase in the current floor's group; y0 = the floor it starts from, relative to that group.
+  // Lego steps (drawn) over a ramp collider through the middle of each tread, with blocks under it
+  // (no walking beneath) and a glass rail with a handrail along both sides.
+  function buildStair(st, y0) {
+    const n = ST.steps
+    const run = ST.run / n
+    const r = S / n
+    const zA = ST.z0
+    const zB = ST.z1
+    const base = y0 + F
+    const at = (u) => st.foot + st.dir * u // distance up the stair -> garage x
+    for (let j = 0; j < n; j++) {
+      const xa = at(j * run)
+      const xb = at((j + 1) * run)
+      box(skinSlab, Math.min(xa, xb), base - 0.02, zA, Math.max(xa, xb), base + r * (j + 1), zB)
+    }
+    // ramp: y = base + r * (u / run + 0.5), from u = -run / 2 (the floor) to the slab above
+    const u0 = -run / 2
+    const u1 = ST.run - run / 2
+    const alpha = Math.atan2(S, u1 - u0)
+    const theta = st.dir * alpha
+    const len = Math.hypot(u1 - u0, S)
+    const nx = -Math.sin(theta) // up-normal of the slope (x, y)
+    const ny = Math.cos(theta)
+    const mx = at((u0 + u1) / 2)
+    const my = base + S / 2
+    const t = 0.3
+    solidTilt(mx - (nx * t) / 2, my - (ny * t) / 2, (zA + zB) / 2, len / 2, t / 2, (zB - zA) / 2, theta)
+    // the last half tread, flush with the floor above
+    solid(Math.min(at(u1), at(ST.run)), base + S - r, zA, Math.max(at(u1), at(ST.run)), base + S, zB)
+    // blocks under the ramp, two steps each
+    for (let j = 2; j < n; j += 2) {
+      const xa = at(j * run)
+      const xb = at(Math.min(n, j + 2) * run)
+      solid(Math.min(xa, xb), base, zA, Math.max(xa, xb), base + r * j, zB)
+    }
+    // side rails: glass panel + handrail, parallel to the ramp
+    const railH = 1.1
+    for (const z of [zA - 0.06, zB + 0.06]) {
+      const gp = tilted(glass, mx + nx * (railH / 2), my + ny * (railH / 2), z, len, railH, 0.08, theta, false)
+      gp.renderOrder = 3
+      tilted(skinRail, mx + nx * (railH + 0.07), my + ny * (railH + 0.07), z, len + 0.2, 0.14, 0.16, theta)
+      solidTilt(mx + nx * ((railH + 0.14) / 2), my + ny * ((railH + 0.14) / 2), z, len / 2, (railH + 0.14) / 2, 0.06, theta)
+      // newel posts at both ends
+      for (const u of [0, ST.run]) box(skinFrame, at(u) - 0.1, base + (u ? S : 0), z - 0.1, at(u) + 0.1, base + (u ? S : 0) + railH + 0.25, z + 0.1)
+    }
+  }
+
+  for (let n = 0; n <= FLOORS.length; n++) buildLevel(n)
+
+  // --- Buy-a-floor plates: where the next staircase will stand, on the floor below it -----------------
+  const floorPlates = FLOORS.map((spec, i) => {
+    const n = i + 1
+    const st = stairOf(n)
+    const holder = new Group()
+    holder.position.y = (n - 1) * S
+    garage.add(holder)
+    const cz = (ST.z0 + ST.z1) / 2
+    boxSpan(holder, upgradeMat, st.x0 + 0.15, F, ST.z0 + 0.15, st.x1 - 0.15, F + 0.18, ST.z1 - 0.15, { shadow: false })
+    boxSpan(holder, upgradeEdge, st.x0, F, ST.z0, st.x1, F + 0.1, ST.z1, { shadow: false })
+    holder.add(sparkleField({ count: 26, center: { x: (st.x0 + st.x1) / 2, y: F + 0.2, z: cz }, box: { x: (st.x1 - st.x0) * 0.9, y: 0.8, z: 1.8 }, rise: 0.6, life: 2, drift: 0.12, size: 0.13, color: '#5ff0ff', seed: 500 + n }))
+    const sign = spriteFrom(
+      paintStack([
+        { size: 50, parts: [{ text: '[Upgrade]', fill: '#ffb21a' }] },
+        { size: 54, parts: [{ text: spec.label, fill: '#3ff0ff' }] },
+        { size: 54, parts: [{ text: '$' + short(spec.price), fill: '#7dff3a' }] },
+      ]),
+      1.5,
+    )
+    sign.position.set((st.x0 + st.x1) / 2, F + 2.3, cz)
+    holder.add(sign)
+    holder.visible = false
+    live.add(holder)
+    // in garage design units, for the game's prompt
+    return { n, label: spec.label, price: spec.price, level: n - 1, x0: st.x0, x1: st.x1, z0: ST.z0, z1: ST.z1, cx: (st.x0 + st.x1) / 2, cz, top: (n - 1) * S + F + 0.18, holder }
+  })
+
+  // --- Roof (rides on the highest floor bought) ------------------------------------------------------
+  const roof = new Group()
+  roof.name = 'garageRoof'
+  garage.add(roof)
+  const roofColliders = []
+  into(roof, { inGarage: true, y: 0, colliders: roofColliders })
   const ov = 0.9
   const roofTop = H + 1.0
-  box(concrete, B.minX - ov, H, B.minZ - ov, B.maxX + ov, roofTop, B.maxZ + ov)
-  box(steel, B.minX - ov - 0.05, H, B.maxZ + ov - 0.3, B.maxX + ov + 0.05, H + 0.35, B.maxZ + ov + 0.05) // front fascia lip
+  box(skinSlab, B.minX - ov, H, B.minZ - ov, B.maxX + ov, roofTop, B.maxZ + ov)
+  box(skinFrame, B.minX - ov - 0.05, H, B.maxZ + ov - 0.3, B.maxX + ov + 0.05, H + 0.35, B.maxZ + ov + 0.05) // front fascia lip
   solid(B.minX - ov, H, B.minZ - ov, B.maxX + ov, roofTop, B.maxZ + ov)
   // skylight recess: a sunken darker square with a raised lip
   const sk = { x0: -4.5, x1: 3.5, z0: -13, z1: -5 }
@@ -210,13 +432,11 @@ export function buildBase(scene, plot, bursts) {
   recess.position.set((sk.x0 + sk.x1) / 2, roofTop + 0.01, (sk.z0 + sk.z1) / 2)
   recess.receiveShadow = true
   add(recess)
-  box(steel, sk.x0 - 0.4, roofTop, sk.z0 - 0.4, sk.x1 + 0.4, roofTop + 0.3, sk.z0)
-  box(steel, sk.x0 - 0.4, roofTop, sk.z1, sk.x1 + 0.4, roofTop + 0.3, sk.z1 + 0.4)
-  box(steel, sk.x0 - 0.4, roofTop, sk.z0, sk.x0, roofTop + 0.3, sk.z1)
-  box(steel, sk.x1, roofTop, sk.z0, sk.x1 + 0.4, roofTop + 0.3, sk.z1)
-  // ceiling light panels
-  const panel = neon('#f2f8ff', 1.5)
-  for (const x of [-6, 6]) for (const z of [-16, -8, 0]) box(panel, x - 1.6, H - 0.08, z - 0.6, x + 1.6, H - 0.01, z + 0.6, false)
+  box(skinFrame, sk.x0 - 0.4, roofTop, sk.z0 - 0.4, sk.x1 + 0.4, roofTop + 0.3, sk.z0)
+  box(skinFrame, sk.x0 - 0.4, roofTop, sk.z1, sk.x1 + 0.4, roofTop + 0.3, sk.z1 + 0.4)
+  box(skinFrame, sk.x0 - 0.4, roofTop, sk.z0, sk.x0, roofTop + 0.3, sk.z1)
+  box(skinFrame, sk.x1, roofTop, sk.z0, sk.x1 + 0.4, roofTop + 0.3, sk.z1)
+  const roofAt = roofColliders.map((c) => ({ ...c.translation() }))
 
   // --- Owner billboard on the front edge of the roof ----------------------------------------------
   const bbW = 9.4
@@ -236,52 +456,10 @@ export function buildBase(scene, plot, bursts) {
   const screen = new Mesh(new PlaneGeometry(bbW - 0.7, bbH - 0.7), new MeshStandardMaterial({ map: screenTex, emissiveMap: screenTex, emissive: '#ffffff', emissiveIntensity: 0.55, roughness: 0.4 }))
   screen.position.set(0, roofTop - 0.6 + bbH / 2, bbZ + 0.02)
   add(screen)
+  live.add(screen)
 
-  // --- Parking bays + green collect pads ------------------------------------------------------------
-  const bayEdge = brick('#adb5d2', { roughness: 0.5 })
-  const bayTop = brick('#c4cbe2', { roughness: 0.45 })
-  const padMat = brick('#5cff24', { roughness: 0.4, emissive: '#3dff10', emissiveIntensity: 0.45 })
-  const upgradeMat = brick('#29d8ff', { roughness: 0.35, emissive: '#10b8ff', emissiveIntensity: 0.55 })
-  const upgradeEdge = brick('#1a8fd8', { roughness: 0.4 })
-  // Bays in garage design units (game/ places blocks and cars on them).
-  const bays = []
-  for (const side of [-1, 1]) {
-    for (let i = 0; i < BASE.slots; i++) {
-      const z = B.minZ + 3.2 + i * 4.6
-      const x0 = side < 0 ? B.minX + 0.9 : 4.6
-      const x1 = side < 0 ? -4.6 : B.maxX - 0.9
-      const edge = box(bayEdge, x0, F, z - 1.85, x1, F + 0.12, z + 1.85, false)
-      const top = box(bayTop, x0 + 0.3, F + 0.12, z - 1.55, x1 - 0.3, F + 0.17, z + 1.55, false)
-      const px = side * 3.4
-      const pad = box(padMat, px - 0.55, F, z - 1.1, px + 0.55, F + 0.16, z + 1.1, false)
-      const bay = { side, x0, x1, z0: z - 1.85, z1: z + 1.85, cx: (x0 + x1) / 2, cz: z, top: F + 0.17, pad: { x: px, z, hx: 0.55, hz: 1.1, top: F + 0.16, mesh: pad }, locked: null }
-      bays.push(bay)
-      const lock = BASE.lockedSlots.find((l) => l.bay === bays.length - 1)
-      if (lock) {
-        // Locked until bought: the bay and its pad are hidden; a glowing cyan studded
-        // plate with an "[Upgrade] / 10th Slot / $price" sign stands in its place.
-        edge.visible = top.visible = pad.visible = false
-        const plate = new Group()
-        const cx = bay.cx
-        boxSpan(plate, upgradeMat, cx - 1.3, F, z - 1.3, cx + 1.3, F + 0.18, z + 1.3, { shadow: false })
-        boxSpan(plate, upgradeEdge, cx - 1.45, F, z - 1.45, cx + 1.45, F + 0.1, z + 1.45, { shadow: false })
-        plate.add(sparkleField({ count: 22, center: { x: cx, y: F + 0.2, z }, box: { x: 1.2, y: 0.6, z: 1.2 }, rise: 0.55, life: 2, drift: 0.12, size: 0.13, color: '#5ff0ff', seed: 300 + bays.length }))
-        add(plate)
-        const sign = spriteFrom(
-          paintStack([
-            { size: 50, parts: [{ text: '[Upgrade]', fill: '#ffb21a' }] },
-            { size: 54, parts: [{ text: lock.label, fill: '#3ff0ff' }] },
-            { size: 54, parts: [{ text: '$' + short(lock.price), fill: '#7dff3a' }] },
-          ]),
-          1.25,
-        )
-        sign.position.set(cx, F + 2.0, z)
-        add(sign)
-        bay.locked = { price: lock.price, label: lock.label, meshes: [edge, top, pad], plate, sign }
-      }
-    }
-  }
-  // interior lights (distances are world metres, so they grow with the scale)
+  // interior lights (distances are world metres, so they grow with the scale); ground floor only
+  into(garage)
   const lights = []
   for (const z of [-14, -3]) {
     const l = new PointLight('#e8f2ff', 14, 22 * gs, 2)
@@ -664,24 +842,59 @@ export function buildBase(scene, plot, bursts) {
 
   // --- Bake: every static mesh merged per material (six garages on the island; mobile) ----------
   // Kept live: the conveyor's blocks and skin props, a locked bay's hidden meshes and its plate,
-  // and the billboard screen.
-  const live = new Set([screen, ...blocks.map((b) => b.holder), ...Object.values(decos)])
-  for (const b of bays) if (b.locked) for (const o of [...b.locked.meshes, b.locked.plate]) live.add(o)
-  const casters = []
-  const flat = []
-  const collect = (o) => {
-    if (live.has(o)) return
-    if (o.isMesh && !Array.isArray(o.material)) (o.castShadow ? casters : flat).push(o)
-    for (const c of o.children) collect(c)
+  // the buy-a-floor plates and the billboard screen. Each floor and the roof are baked on their
+  // own (a floor shows once bought, the roof moves up).
+  for (const o of [...blocks.map((b) => b.holder), ...Object.values(decos)]) live.add(o)
+  const sections = [...levels.map((l) => l.group), roof]
+  const bakeSection = (root, skip) => {
+    const casters = []
+    const flat = []
+    const collect = (o) => {
+      if (skip.has(o)) return
+      if (o.isMesh && !Array.isArray(o.material)) (o.castShadow ? casters : flat).push(o)
+      for (const c of o.children) collect(c)
+    }
+    for (const c of root.children) collect(c)
+    for (const [list, cast] of [[casters, true], [flat, false]]) {
+      if (!list.length) continue
+      const baked = bakeMeshes(list, root, cast)
+      baked.traverse((o) => o.isMesh && (o.receiveShadow = true))
+      for (const m of list) m.parent.remove(m)
+      root.add(baked)
+    }
   }
-  collect(g)
-  for (const [list, cast] of [[casters, true], [flat, false]]) {
-    if (!list.length) continue
-    const baked = bakeMeshes(list, g, cast)
-    baked.traverse((o) => o.isMesh && (o.receiveShadow = true))
-    for (const m of list) m.parent.remove(m)
-    g.add(baked)
+  bakeSection(g, new Set([...live, ...sections]))
+  for (const s of sections) bakeSection(s, live)
+
+  // --- Floors bought (setFloors) and skin (setSkin) ----------------------------------------------
+  let floors = -1
+  function showFloors(n) {
+    n = Math.max(0, Math.min(FLOORS.length, n | 0))
+    if (n === floors) return false
+    floors = n
+    levels.forEach((l, i) => {
+      const on = i <= n
+      l.group.visible = on
+      for (const c of l.colliders) c.setEnabled(on)
+    })
+    for (const p of floorPlates) p.holder.visible = p.n === n + 1
+    roof.position.y = n * S
+    roofColliders.forEach((c, i) => c.setTranslation({ x: roofAt[i].x, y: roofAt[i].y + n * S * gs, z: roofAt[i].z }))
+    return true
   }
+  showFloors(0)
+  let skinId = null
+  let rainbow = false
+  const skinMats = { frame: [skinFrame, skinRail], truss: [trussV, trussH], slab: [skinSlab], glass: [glass], bay: [bayEdge], bayTop: [bayTop] }
+  function applySkin(id) {
+    const sk = GARAGE_SKINS.find((s) => s.id === id) ?? GARAGE_SKINS[0]
+    if (sk.id === skinId) return false
+    skinId = sk.id
+    for (const key in skinMats) for (const m of skinMats[key]) m.color.set(sk.colors[key])
+    rainbow = !!sk.rainbow
+    return true
+  }
+  applySkin(GARAGE_SKINS[0].id)
 
   scene.add(g)
 
@@ -696,6 +909,37 @@ export function buildBase(scene, plot, bursts) {
     yaw,
     spot,
     bays,
+    storey: S, // garage units between two floors
+    floorPlates, // per extra floor: where it is bought (garage units) and its price
+    get floors() {
+      return floors
+    },
+    // Shows the first n extra floors (BASE.floors) with their stairs and colliders, the roof on
+    // top and the plate to buy the next one; animate = sparks on the new floor.
+    setFloors(n, animate = false) {
+      const before = floors
+      if (!showFloors(n) || !animate || !bursts || floors <= before) return
+      for (let f = before + 1; f <= floors; f++) {
+        for (const x of [-8, 0, 8]) {
+          const p = garage.localToWorld(v.set(x, f * S + F + 1, -8))
+          bursts.emit(p.x, p.y, p.z, '#5ff0ff', 30, 8)
+          bursts.emit(p.x, p.y + 2, p.z, '#ffffff', 16, 6)
+        }
+      }
+    },
+    get skin() {
+      return skinId
+    },
+    // Recolours the garage (GARAGE_SKINS id); animate = sparks around it.
+    setSkin(id, animate = false) {
+      if (!applySkin(id) || !animate || !bursts) return
+      for (let f = 0; f <= floors; f++) {
+        for (const x of [B.minX, 0, B.maxX]) {
+          const p = garage.localToWorld(v.set(x, f * S + H * 0.6, 0))
+          bursts.emit(p.x, p.y, p.z, GARAGE_SKINS.find((s) => s.id === skinId).colors.frame, 30, 8)
+        }
+      }
+    },
     blocks,
     beltY,
     blockMaterial: blockMat, // (theme, variant?)
@@ -812,6 +1056,14 @@ export function buildBase(scene, plot, bursts) {
       const pulse = 0.35 + Math.sin(elapsed * 2.4) * 0.15 + night * 0.4
       padMat.emissiveIntensity = pulse
       upgradeMat.emissiveIntensity = 0.45 + Math.sin(elapsed * 3.2) * 0.2 + night * 0.4
+      if (rainbow) {
+        const hue = (elapsed * 0.07) % 1
+        skinFrame.color.setHSL(hue, 0.85, 0.52)
+        skinRail.color.setHSL(hue, 0.85, 0.52)
+        trussV.color.setHSL((hue + 0.33) % 1, 0.9, 0.72)
+        trussH.color.setHSL((hue + 0.33) % 1, 0.9, 0.72)
+        glass.color.setHSL((hue + 0.66) % 1, 0.7, 0.85)
+      }
       for (const b of blocks) {
         b.travelled += dt * Cv.speed
         if (b.travelled >= loop) {

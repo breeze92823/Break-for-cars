@@ -32,7 +32,7 @@ import {
   Vector2,
   Vector3,
 } from 'three'
-import { BLOCK_THEMES, CAR_ROSTER, CONVEYOR_SKINS, CONVEYOR_UPGRADE, GAME, MUTATIONS, PICKAXES, RARITY_COLORS, RARITY_INCOME, RARITY_LADDER } from '../config.js'
+import { BASE, BLOCK_THEMES, CAR_ROSTER, CONVEYOR_SKINS, CONVEYOR_UPGRADE, GAME, GARAGE_SKINS, LOBBY, MUTATIONS, PICKAXES, RARITY_COLORS, RARITY_INCOME, RARITY_LADDER, SKINS_PAD, TUTORIAL } from '../config.js'
 import { brick } from '../lego.js'
 import { buildCar } from '../lobby/cars.js'
 import { paintStack, short } from '../lobby/paint.js'
@@ -48,6 +48,10 @@ import { createDaily } from './daily.js'
 import { createEvents } from './events.js'
 import { createIndex } from './carindex.js'
 import { createSpin } from './spin.js'
+import { createTrade } from './trade.js'
+import { createSettings } from './settings.js'
+import { createBaseSkins } from './baseskins.js'
+import { createTutorial, TUTORIAL_DONE } from './tutorial.js'
 import { buildPickaxe, disposePickaxe } from './pickaxe-model.js'
 import { renderPickaxeIcons } from '../hud/thumbnails.js'
 import { makeCanvas, paintHpLabel, paintPadMoney, paintUpgradeSign } from './paint.js'
@@ -74,8 +78,12 @@ const themeOfRarity = (rarity) => Object.keys(BLOCK_THEMES).find((k) => BLOCK_TH
 const MUT = Object.fromEntries(MUTATIONS.filter((m) => m.mult > 1).map((m) => [m.id, m]))
 const withVariant = (v) => (MUT[v] ? { variant: v } : {})
 
-// Economy formulas.
-const incomeOf = (car) => car.base * Math.pow(GAME.upgrade.incomeGrowth, car.level - 1)
+// Economy formulas. A car's own $/s (hotbar, trades) and what it earns parked in the garage:
+// times the equipped garage skin's multiplier (GARAGE_SKINS mult, set by the game).
+const rawIncome = (car) => car.base * Math.pow(GAME.upgrade.incomeGrowth, car.level - 1)
+let garageMult = 1
+const incomeOf = (car) => rawIncome(car) * garageMult
+const SKIN_BY_ID = Object.fromEntries(GARAGE_SKINS.map((s) => [s.id, s]))
 const upgradeCost = (car) => Math.round(car.base * GAME.upgrade.costFactor * Math.pow(GAME.upgrade.costGrowth, car.level - 1))
 // $/s with a decimal while it is small (2.7 reads better than 3).
 const rate = (v) => (v < 100 && v % 1 ? v.toFixed(1) : short(v))
@@ -93,7 +101,8 @@ function spriteOf(canvas, height) {
 
 // onSwing(): a swing started (relayed so the others see it).
 // rewardedAd: { available(), watch() } for the Spin Wheel's "Watch Ad" button (spin.js).
-export function createGame({ scene, camera, canvas, base, bursts, hud, playerGroup, playerFx, getAvatar, getAnimator, lobby, onSwing, rewardedAd }) {
+// onTutorialStep(step): the new-player tutorial moved on (net.js saves it for the account).
+export function createGame({ scene, camera, canvas, base, bursts, hud, playerGroup, playerFx, getAvatar, getAnimator, lobby, onSwing, rewardedAd, nearbyPlayer, onTutorialStep }) {
   let g = base.group
   g.updateMatrixWorld(true)
   base.setLit(true)
@@ -105,14 +114,17 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
 
   // --- State + save ---------------------------------------------------------------------------
   const carIndex = createIndex(layer, { sfx })
-  const state = { carryVariant: null, money: GAME.startMoney, carrying: null, equipped: true, autoSwing: false, conveyorLevel: 0, cars: [], held: -1, pickaxe: PICKAXES[0].id }
+  const state = { carryVariant: null, money: GAME.startMoney, carrying: null, equipped: true, autoSwing: false, conveyorLevel: 0, cars: [], held: -1, pickaxe: PICKAXES[0].id, floors: 0, skin: GARAGE_SKINS[0].id }
+  const boughtSkins = new Set() // garage skins bought with money (an Index unlock needs no record)
   const ownedPicks = new Set([PICKAXES[0].id]) // the first (free) pickaxe is always owned
   const pick = () => PICK_BY_ID[state.pickaxe] ?? PICKAXES[0]
   const slots = bays.map(() => null) // per bay: null | block record | car record
   const unlocked = new Set() // bought bays among BASE.lockedSlots
-  const isOpen = (i) => !bays[i].locked || unlocked.has(i)
+  // A bay can be used once its floor is bought (and, for a locked one, the bay itself).
+  const isOpen = (i) => bays[i].level <= state.floors && (!bays[i].locked || unlocked.has(i))
   const views = bays.map(() => null)
 
+  let escrowed = () => [] // cars held aside by an open trade (trade.js): saved with the hotbar so a reload loses none
   function save() {
     try {
       const data = {
@@ -123,9 +135,12 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
         carryVariant: state.carryVariant,
         conveyorLevel: state.conveyorLevel,
         unlocked: [...unlocked],
+        floors: state.floors,
+        skin: state.skin,
+        skins: [...boughtSkins],
         pickaxe: state.pickaxe,
         pickaxes: [...ownedPicks],
-        cars: state.cars,
+        cars: [...state.cars, ...escrowed()],
         bays: slots.map((s) => (s ? { ...s } : null)),
       }
       localStorage.setItem(GAME.saveKey, JSON.stringify(data))
@@ -142,6 +157,10 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
       state.carryVariant = state.carrying && MUT[data.carryVariant] ? data.carryVariant : null
       state.conveyorLevel = Math.max(0, Math.min(CONVEYOR_UPGRADE.levels.length - 1, data.conveyorLevel | 0))
       for (const i of data.unlocked || []) if (bays[i]?.locked) unlocked.add(i)
+      state.floors = Math.max(0, Math.min(BASE.floors.length, data.floors | 0))
+      for (const id of data.skins || []) if (SKIN_BY_ID[id]) boughtSkins.add(id)
+      if (SKIN_BY_ID[data.skin]) state.skin = data.skin
+      garageMult = SKIN_BY_ID[state.skin].mult // before the away earnings below
       state.cars = (data.cars || [])
         .filter((c) => c && BLOCK_THEMES[c.theme] && c.look)
         .slice(0, GAME.inventory)
@@ -442,7 +461,7 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
       equipped: state.equipped,
       carrying: state.carrying,
       held: state.held,
-      cars: state.cars.map((c) => ({ look: c.look, name: c.name, level: c.level, income: `$${rate(incomeOf(c))}/s`, color: RARITY_COLORS[c.rarity] ?? '#fff' })),
+      cars: state.cars.map((c) => ({ look: c.look, name: c.name, level: c.level, income: `$${rate(rawIncome(c))}/s`, color: RARITY_COLORS[c.rarity] ?? '#fff' })),
     })
   }
   function showCarry() {
@@ -528,6 +547,7 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
     let bestD = GAME.hitReach
     for (let i = 0; i < slots.length; i++) {
       if (slots[i]?.kind !== 'block' || !views[i]?.landed) continue
+      if (Math.abs(bayWorld[i].y - player.position.y) > 4) continue // a block on another floor
       const d = Math.hypot(bayWorld[i].x - player.position.x, bayWorld[i].z - player.position.z) - GAME.placedSize / 2
       if (d < bestD) {
         bestD = d
@@ -592,6 +612,50 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
     hud.toast(`${lock.label} unlocked!`)
     shake = Math.max(shake, 0.1)
     save()
+  }
+
+  // Buy the next floor (its "[Upgrade] 2nd Floor" plate, where its staircase will stand).
+  function buyFloor(n) {
+    const plate = base.floorPlates[n - 1]
+    if (!plate || n !== state.floors + 1) return
+    if (state.money < plate.price) return fail(`Not enough money: need $${short(plate.price - state.money)} more`)
+    setMoney(state.money - plate.price)
+    state.floors = n
+    base.setFloors(n, true)
+    sfx.buy()
+    setTimeout(sfx.upgrade, 120)
+    sfx.reveal(3)
+    const at = g.localToWorld(base.garageToBase(plate.cx, plate.top, plate.cz, v1))
+    floatText(`-$${short(plate.price)}`, at.add(v2.set(0, 2.4, 0)), '#ff6a4a', true)
+    hud.announce(`${plate.label} built! 10 more bays upstairs`)
+    shake = Math.max(shake, 0.35)
+    save()
+  }
+
+  // --- Garage skins: owned once bought or once enough of the Index is found ---------------------------
+  const skinOwned = (id) => SKIN_BY_ID[id] && (boughtSkins.has(id) || carIndex.percent() >= SKIN_BY_ID[id].index)
+  function equipSkin(id, quiet) {
+    if (!skinOwned(id) || state.skin === id) return
+    state.skin = id
+    garageMult = SKIN_BY_ID[id].mult
+    base.setSkin(id, !quiet)
+    for (let i = 0; i < slots.length; i++) if (slots[i]?.kind === 'car' && views[i]) repaintCarLabel(i)
+    refreshIncome()
+    if (!quiet) {
+      sfx.upgrade()
+      hud.toast(`${SKIN_BY_ID[id].name} equipped! Cars in your garage earn x${SKIN_BY_ID[id].mult}`)
+      shake = Math.max(shake, 0.2)
+    }
+    save()
+  }
+  function buySkin(id) {
+    const sk = SKIN_BY_ID[id]
+    if (!sk || skinOwned(id)) return
+    if (state.money < sk.price) return fail(`Not enough money: need $${short(sk.price - state.money)} more`)
+    setMoney(state.money - sk.price)
+    boughtSkins.add(id)
+    sfx.buy()
+    equipSkin(id, false)
   }
 
   function buy(b) {
@@ -911,6 +975,32 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
   })
   let onLuckPad = false
 
+  // --- "Bases" pad: stepping on it opens the Base Skins window ------------------------------------------
+  const skinPadMat = brick('#ff9a1a', { roughness: 0.4, emissive: '#ff7a00', emissiveIntensity: 0.45 })
+  const skinPad = new Mesh(new BoxGeometry(SKINS_PAD.size, 0.14, SKINS_PAD.size), skinPadMat)
+  skinPad.position.set(SKINS_PAD.x, 0.2, SKINS_PAD.z)
+  skinPad.receiveShadow = true
+  g.add(skinPad)
+  let skinPadWorld = g.localToWorld(skinPad.position.clone())
+  const skinStack = paintStack(
+    [
+      { size: 56, parts: [{ text: 'Bases', fill: '#ffb21a' }] },
+      { size: 46, parts: [{ text: 'Unlock base skins!', fill: '#ffffff' }] },
+    ],
+    { width: 640 },
+  )
+  const skinLabel = spriteOf(skinStack.canvas, 1.9)
+  skinLabel.position.set(SKINS_PAD.x, 2.8, SKINS_PAD.z)
+  g.add(skinLabel)
+  fontReady.then(() => {
+    skinStack.draw()
+    skinLabel.material.map.needsUpdate = true
+    skinLabel.userData.fit()
+  })
+  const skinSparkle = sparkleField({ count: 14, center: { x: SKINS_PAD.x, y: 0.2, z: SKINS_PAD.z }, box: { x: SKINS_PAD.size, y: 1.6, z: SKINS_PAD.size }, rise: 0.7, life: 1.8, size: 0.18, color: '#ffb21a', seed: 78 })
+  g.add(skinSparkle)
+  let onSkinPad = false
+
   // --- Pickaxes Shop: buy with money, equip any owned one ----------------------------------------------
   let pickIcons = null
   function equipPickaxe(id, quiet) {
@@ -936,6 +1026,7 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
     floatText(`-$${short(p.price)}`, v1.copy(player.position).add(v2.set(0, 2.6, 0)), '#ff6a4a', true)
     equipPickaxe(id, true)
     hud.toast(`Bought ${p.name}! ${short(p.damage)} damage per hit`)
+    tutorialProgress()
     bursts.emit(player.position.x, player.position.y + 1.6, player.position.z, '#ffe14a', 30, 6)
   }
   const sellShop = createSellShop(layer, {
@@ -958,8 +1049,9 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
       save()
       return car
     },
-    give(car) {
-      if (state.cars.length >= GAME.inventory) return false
+    sellValue: sellValue,
+    give(car, force = false) {
+      if (!force && state.cars.length >= GAME.inventory) return false
       state.cars.push({ theme: car.theme, rarity: car.rarity, name: car.name, look: car.look, base: car.base, level: car.level || 1, spent: car.spent || 0, ...withVariant(car.variant) })
       carIndex.discover(car)
       showCarry()
@@ -989,7 +1081,8 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
   })
   const daily = createDaily(layer, { inv, hud, sfx, onReady: (on) => hud.setDailyReady?.(on), onClaim: () => cheer('#ffe14a') })
   // One window at a time: opening one closes the rest (pickShop is added below).
-  const windows = [sellShop, fuseMachine, daily, carIndex]
+  const settings = createSettings(layer, { sfx, hud })
+  const windows = [sellShop, fuseMachine, daily, carIndex, settings]
   const events = createEvents(layer, { lobby, base, hud, sfx })
   const spinWheel = createSpin(layer, {
     inv,
@@ -1021,6 +1114,38 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
     onClose: () => sfx.blip(),
   })
   windows.push(pickShop)
+  const baseSkins = createBaseSkins(layer, {
+    isOwned: skinOwned,
+    equipped: () => state.skin,
+    indexPct: () => carIndex.percent(),
+    onBuy: buySkin,
+    onEquip: (id) => equipSkin(id, false),
+    onLocked: (sk) => fail(`Get ${Math.round(sk.index * 100)}% of the Index to unlock ${sk.name}, or buy it for $${short(sk.price)}`),
+    onClose: () => sfx.blip(),
+  })
+  windows.push(baseSkins)
+  const trade = createTrade(layer, {
+    inv,
+    hud,
+    sfx,
+    income: rawIncome,
+    beforeOpen: () => solo(trade),
+    onDone: () => cheer('#7dff3a'),
+  })
+  escrowed = trade.escrowed
+  windows.push(trade)
+  // The Trade prompt over the nearest other player (E / tap).
+  const tradeTarget = { id: '', action: 'Trade', object: '', color: '#7dff3a', hold: 0, anchor: new Vector3(), sid: '', onDone: () => trade.request(tradeTarget.sid) }
+  function tradePrompt() {
+    if (!trade.idle || !nearbyPlayer) return null
+    const n = nearbyPlayer()
+    if (!n) return null
+    tradeTarget.id = `trade:${n.id}`
+    tradeTarget.sid = n.id
+    tradeTarget.object = n.name
+    tradeTarget.anchor.set(n.x, n.y + 3.1, n.z)
+    return tradeTarget
+  }
   fontReady.then(() => {
     pickIcons = renderPickaxeIcons(PICKAXES)
     pickShop.setIcons(pickIcons)
@@ -1075,6 +1200,7 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
   let buyTargets = buyTargetsOf(base)
   const placeTargets = bays.map((_, i) => ({ id: `place${i}`, action: 'Place', object: '', hold: 0, anchor: bayWorld[i].clone().add(new Vector3(0, 1.6, 0)), onDone: () => place(i) }))
   const slotTargets = bays.map((b, i) => (b.locked ? { id: `slot${i}`, action: `Buy  $${short(b.locked.price)}`, object: b.locked.label, color: '#3ff0ff', hold: GAME.buyHold, anchor: bayWorld[i].clone().add(new Vector3(0, 1.4, 0)), onDone: () => buySlot(i) } : null))
+  const floorTarget = { id: 'floor', n: 0, action: '', object: '', color: '#3ff0ff', hold: GAME.buyHold, anchor: new Vector3(), onDone: () => buyFloor(floorTarget.n) }
   const removeTargets = bays.map((_, i) => ({ id: `remove${i}`, action: 'Remove', object: '', hold: GAME.removeHold, anchor: bayWorld[i].clone().add(new Vector3(0, 2.2, 0)), onDone: () => removeCar(i) }))
 
   function pickPrompt(pl) {
@@ -1098,15 +1224,25 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
       })
       if (best) return best
     }
-    const onFloor = pl.y < bays[0].top + 3
-    if (!onFloor) return null
-    for (let i = 0; i < bays.length; i++) if (!isOpen(i) && rectDist(bays[i], pl) < 0.9) return slotTargets[i]
+    // Only the bays (and the floor plate) on the floor the player stands on.
+    const sameFloor = (i) => Math.abs(pl.y - bays[i].top) < 2.5
+    if (!bays.some((_, i) => sameFloor(i))) return null
+    const fp = base.floorPlates[state.floors]
+    if (fp && Math.abs(pl.y - fp.top) < 2.5 && rectDist(fp, pl) < 0.6) {
+      floorTarget.id = `floor${fp.n}`
+      floorTarget.n = fp.n
+      floorTarget.action = `Buy  $${short(fp.price)}`
+      floorTarget.object = fp.label
+      g.localToWorld(base.garageToBase(fp.cx, fp.top, fp.cz, floorTarget.anchor)).add(v2.set(0, 1.4, 0))
+      return floorTarget
+    }
+    for (let i = 0; i < bays.length; i++) if (bays[i].locked && !isOpen(i) && sameFloor(i) && rectDist(bays[i], pl) < 0.9) return slotTargets[i]
     if (busy()) {
       const heldCar = state.held >= 0 ? state.cars[state.held] : null
       let best = null
       let bestD = GAME.placeReach
       for (let i = 0; i < bays.length; i++) {
-        if (slots[i] || !isOpen(i)) continue
+        if (slots[i] || !isOpen(i) || !sameFloor(i)) continue
         const d = rectDist(bays[i], pl)
         if (d < bestD) {
           bestD = d
@@ -1122,7 +1258,7 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
     let bestD = GAME.removeReach
     for (let i = 0; i < bays.length; i++) {
       const s = slots[i]
-      if (s?.kind !== 'car' || views[i].t < 1) continue
+      if (s?.kind !== 'car' || views[i].t < 1 || !sameFloor(i)) continue
       const d = rectDist(bays[i], pl)
       if (d >= bestD) continue
       bestD = d
@@ -1133,11 +1269,188 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
     return best
   }
 
+  // --- New-player tutorial (game/tutorial.js) ----------------------------------------------------------------
+  // A save from before the tutorial existed (a game save but no tutorial record) counts as finished.
+  let hadSave = false
+  try {
+    hadSave = localStorage.getItem(GAME.saveKey) !== null
+  } catch {
+    // ignore
+  }
+  const tutorial = createTutorial({ layer, scene, sfx, onStep: (n) => onTutorialStep?.(n) })
+  if (tutorial.fresh && hadSave) tutorial.advance(TUTORIAL_DONE, { quiet: true })
+  const goalPick = PICK_BY_ID[TUTORIAL.pickaxe] ?? PICKAXES[1]
+
+  // Moves the tutorial on from what the player has done (bought a block, placed it, got a car, saved
+  // up, bought a pickaxe), whichever way they did it (the belt, the Spin Wheel, a trade, ...).
+  function tutorialProgress() {
+    const now = tutorial.step
+    if (now >= TUTORIAL_DONE) return
+    if (ownedPicks.size > 1) return void tutorial.advance(TUTORIAL_DONE)
+    let want = now
+    if (state.carrying) want = Math.max(want, 1)
+    let car = state.cars.length > 0
+    for (const sl of slots) {
+      if (sl?.kind === 'block') want = Math.max(want, 2)
+      else if (sl?.kind === 'car') car = true
+    }
+    if (car) want = Math.max(want, 3)
+    if (want >= 3 && state.money >= goalPick.price) want = 4
+    if (want <= now) return
+    if (want === 4) tutorial.flash(TUTORIAL.afford.replace('{name}', goalPick.name))
+    tutorial.advance(want)
+  }
+
+  // The arrows' route to the next thing to do: world points from the player's feet (reused objects).
+  const B = BASE.building
+  const F = B.floor
+  const route = Array.from({ length: 14 }, () => new Vector3())
+  const path = []
+  let routeN = 0
+  const shopZone = lobby?.zones?.find((z) => z.id === 'pickaxes')
+  const at = (v) => route[routeN++].copy(v)
+  const atBase = (x, y, z) => g.localToWorld(route[routeN++].set(x, y, z)) // base-group metres
+  const atGarage = (x, y, z) => g.localToWorld(base.garageToBase(x, y, z, route[routeN++])) // garage design units
+  // Drops the leading points (from index `from`) the player has already passed: the route resumes
+  // at the end of the segment nearest to them.
+  function trimRoute(from) {
+    const p = player.position
+    let best = Math.hypot(p.x - route[from].x, p.z - route[from].z)
+    let skip = 0
+    for (let j = from; j < routeN - 1; j++) {
+      const a = route[j]
+      const b = route[j + 1]
+      const dx = b.x - a.x
+      const dz = b.z - a.z
+      const t = clamp01(((p.x - a.x) * dx + (p.z - a.z) * dz) / (dx * dx + dz * dz || 1))
+      const d = Math.hypot(p.x - (a.x + dx * t), p.z - (a.z + dz * t))
+      if (d < best) {
+        best = d
+        skip = j + 1 - from
+      }
+    }
+    if (!skip) return
+    for (let j = from; j + skip < routeN; j++) route[j].copy(route[j + skip])
+    routeN -= skip
+  }
+  // Into the garage through its open front, up the aisle, to (x, z) (garage design units).
+  function intoGarage(pl, inside, x, z) {
+    if (!inside) {
+      const atDoor = pl.z > B.maxZ && pl.z < B.maxZ + 4 && Math.abs(pl.x) < B.maxX - 2
+      if (!atDoor) atGarage(0, 0.1, B.maxZ + 2.5)
+      atGarage(0, F + 0.2, B.maxZ - 1.5)
+    }
+    if (!inside || Math.abs(pl.z - z) > 2.2) atGarage(0, F + 0.2, z)
+    atGarage(x, F + 0.2, z)
+  }
+  function outOfGarage(inside) {
+    if (!inside) return
+    atGarage(0, F + 0.2, B.maxZ - 1.5)
+    atGarage(0, 0.1, B.maxZ + 2.5)
+  }
+  // Fills `route` and returns how close (m) the player may get before the arrows go, or -1 for none.
+  function tutorialRoute(pl) {
+    routeN = 0
+    at(player.position)
+    const inside = pl.x > B.minX && pl.x < B.maxX && pl.z > B.minZ && pl.z < B.maxZ + 0.3 && pl.y < B.height
+    const step = tutorial.step
+    if (step === 0) {
+      // the nearest belt block the player can pay for; the arrows end on the apron in front of it
+      let best = null
+      let bestD = Infinity
+      for (const b of base.blocks) {
+        if (!base.onBelt(b) || BLOCK_THEMES[b.key].price > state.money) continue
+        const d = base.blockWorld(b, v1).distanceToSquared(player.position)
+        if (d < bestD) {
+          bestD = d
+          best = b
+        }
+      }
+      if (!best) return -1
+      outOfGarage(inside)
+      const Cv = BASE.conveyor
+      const lx = Math.max(Cv.from + 1, Math.min(Cv.to - 1, best.holder.position.x))
+      atBase(lx, 0.2, Cv.z - Cv.belt / 2 - Cv.wall - 1.6)
+      return 2.4
+    }
+    if (step === 1 || step === 2) {
+      // a free bay (the one nearest the player) / the bay with the placed block
+      let bay = -1
+      let bestD = Infinity
+      for (let i = 0; i < bays.length; i++) {
+        if (bays[i].level !== 0) continue
+        const ok = step === 1 ? !slots[i] && isOpen(i) : slots[i]?.kind === 'block'
+        if (!ok) continue
+        const d = Math.hypot(bays[i].cx - pl.x, bays[i].cz - pl.z)
+        if (d < bestD) {
+          bestD = d
+          bay = i
+        }
+      }
+      if (bay < 0) return -1
+      intoGarage(pl, inside, bays[bay].cx, bays[bay].cz)
+      return 3.2
+    }
+    if (step === 3) {
+      // the green pad of the car with the most money waiting
+      let bay = -1
+      let most = -1
+      for (let i = 0; i < bays.length; i++) {
+        const sl = slots[i]
+        if (bays[i].level !== 0 || sl?.kind !== 'car') continue
+        const m = sl.stored + (sl.away || 0)
+        if (m > most) {
+          most = m
+          bay = i
+        }
+      }
+      if (bay < 0) return -1
+      intoGarage(pl, inside, bays[bay].pad.x, bays[bay].pad.z)
+      return 1.6
+    }
+    if (step === 4 && shopZone) {
+      // out of the garage, round the end of the conveyor nearer the plaza (between the limited car and
+      // the tunnel box), down the road to the stall
+      outOfGarage(inside)
+      const from = routeN
+      const sideOf = (s) => g.localToWorld(v2.set(s * 37, 0.1, 28)).distanceToSquared(v1.set(shopZone.x, 0, shopZone.z))
+      const s = sideOf(1) < sideOf(-1) ? 1 : -1
+      atBase(s * 25, 0.1, 28)
+      atBase(s * 37, 0.1, 28)
+      const out = atBase(s * 37, 0.1, 46)
+      const lane = Math.sign(out.x || 1) * 2.6
+      at(v2.set(lane, 0.1, out.z))
+      at(v2.set(lane, 0.1, LOBBY.road.south - 4))
+      at(v2.set(shopZone.x, 0.1, shopZone.z))
+      if (!inside) trimRoute(from)
+      return 2.2
+    }
+    return -1
+  }
+  function tutorialUpdate(dt, pl) {
+    tutorialProgress()
+    let show = null
+    if (tutorial.step < TUTORIAL_DONE) {
+      const hide = tutorialRoute(pl)
+      const end = route[routeN - 1]
+      if (hide >= 0 && routeN > 1 && Math.hypot(end.x - player.position.x, end.z - player.position.z) > hide) {
+        path.length = 0
+        for (let i = 0; i < routeN; i++) path.push(route[i])
+        show = path
+      }
+    }
+    const step = Math.min(tutorial.step, TUTORIAL.steps.length - 1)
+    const text = TUTORIAL.steps[step].replace('{money}', short(Math.floor(state.money))).replace('{goal}', short(goalPick.price))
+    tutorial.update(dt, text, show)
+  }
+
   // --- Boot from the save ------------------------------------------------------------------------------------
   const away = load()
   // Index: everything owned counts as discovered (covers saves from before the Index).
   for (const c of [...state.cars, ...slots.filter((s) => s?.kind === 'car')]) carIndex.discover(c)
   for (const i of unlocked) base.unlockBay(i, false)
+  base.setFloors(state.floors, false)
+  base.setSkin(state.skin, false)
   dressTool()
   for (let i = 0; i < slots.length; i++) {
     if (slots[i]?.kind === 'block') buildBlockView(i, false)
@@ -1149,7 +1462,7 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
   showCarry()
   refreshIncome()
   if (away >= 1) setTimeout(() => hud.toast(`Welcome back! Your cars earned $${short(away)} while you were away. Walk onto each car's green pad to collect it`, 3600), 1200)
-  else if (!slots.some(Boolean)) setTimeout(() => hud.toast('Buy a block from the conveyor (hold E), carry it to a bay in your garage!', 4200), 1500)
+  else if (!slots.some(Boolean) && tutorial.done) setTimeout(() => hud.toast('Buy a block from the conveyor (hold E), carry it to a bay in your garage!', 4200), 1500)
   let saveClock = 0
   window.addEventListener('beforeunload', save)
   document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && save())
@@ -1164,6 +1477,8 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
     if (!next || next === base) return
     const prev = base
     for (const i of unlocked) prev.lockBay(i)
+    prev.setFloors(0)
+    prev.setSkin(GARAGE_SKINS[0].id)
     prev.setLuck(1)
     prev.setConveyorSkin(0, false)
     prev.setIncome(0)
@@ -1175,8 +1490,9 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
     for (const v of views) if (v) for (const o of [v.holder, v.label, v.signHolder, v.padText]) if (o) g.add(o)
     for (const d of debris) g.add(d.m)
     for (const f of fxs) g.add(f.obj)
-    g.add(luckPad, luckLabel, luckSparkle)
+    g.add(luckPad, luckLabel, luckSparkle, skinPad, skinLabel, skinSparkle)
     g.updateMatrixWorld(true)
+    skinPadWorld = g.localToWorld(skinPad.position.clone())
     bayWorld = bayBase.map((p) => g.localToWorld(p.clone()))
     padWorld = padBase.map((p) => g.localToWorld(p.clone()))
     luckPadWorld = g.localToWorld(luckPad.position.clone())
@@ -1186,6 +1502,8 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
     buyTargets = buyTargetsOf(base)
     if (faceTo) faceTo = null
     for (const i of unlocked) base.unlockBay(i, false)
+    base.setFloors(state.floors, false)
+    base.setSkin(state.skin, false)
     base.setLuck(CU.levels[state.conveyorLevel].luck)
     base.setConveyorSkin(skinFor(state.conveyorLevel), false)
     base.setLit(true)
@@ -1201,6 +1519,8 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
     return {
       lvl: state.conveyorLevel,
       unl: [...unlocked],
+      fl: state.floors,
+      sk: state.skin,
       inc: Math.round(inc * 100) / 100,
       bays: slots.map((s) => {
         if (!s) return null
@@ -1216,6 +1536,11 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
     },
     moveTo,
     baseSnapshot,
+    // The new-player tutorial's step (0-4, 5 = done; net.js reports it and syncs it with the server).
+    get tutorialStep() {
+      return tutorial.step
+    },
+    syncTutorial: (step) => tutorial.sync(step),
     // Hands full or mid-swing (an emote stops for it).
     get busy() {
       return busy() || swingT >= 0
@@ -1264,6 +1589,7 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
     swing,
     // HUD calendar / gear buttons.
     toggleDaily: () => (solo(daily), daily.toggle()),
+    toggleSettings: () => (solo(settings), settings.toggle()),
     toggleIndex: () => (solo(carIndex), carIndex.toggle()),
     toggleSpin: () => (solo(spinWheel), spinWheel.toggle()),
     events, // dev: __game.game.events.start('Golden')
@@ -1357,8 +1683,20 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
         paintLuckLabel()
       }
 
+      // Bases pad: stepping on opens Base Skins, stepping off closes it.
+      const onSP = Math.abs(lp.x - skinPadWorld.x) < SKINS_PAD.size / 2 + 0.2 && Math.abs(lp.z - skinPadWorld.z) < SKINS_PAD.size / 2 + 0.2 && lp.y < skinPadWorld.y + 1.5
+      if (onSP && !onSkinPad) {
+        solo(baseSkins)
+        baseSkins.open()
+        sfx.blip()
+      } else if (!onSP && onSkinPad) baseSkins.close()
+      onSkinPad = onSP
+      skinPadMat.emissiveIntensity = 0.35 + Math.sin(elapsed * 3 + 1) * 0.15
+
+      tutorialUpdate(dt, pl)
+
       // Prompt.
-      prompt.set(pickPrompt(pl))
+      prompt.set(pickPrompt(pl) ?? tradePrompt())
       prompt.update(dt)
 
       // Placed blocks (drop-in, hit punch) and cars (reveal, upgrade pop).
@@ -1405,7 +1743,7 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
         s.stored += incomeOf(s) * dt
         const view = views[i]
         const pad = bays[i].pad
-        const on = Math.abs(pl.x - pad.x) < pad.hx + 0.3 && Math.abs(pl.z - pad.z) < pad.hz + 0.3 && pl.y < pad.top + 1.5
+        const on = Math.abs(pl.x - pad.x) < pad.hx + 0.3 && Math.abs(pl.z - pad.z) < pad.hz + 0.3 && pl.y < pad.top + 1.5 && pl.y > pad.top - 1
         if (on && !view.onPad) {
           collect(i, false)
           view.padClock = 0

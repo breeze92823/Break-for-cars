@@ -101,6 +101,11 @@ export function createIndex(layer, { sfx }) {
     open: show,
     close: hide,
     toggle: () => (open ? hide() : show()),
+    // How much of the Index is found, 0..1: distinct cars owned in any variant (unlocks garage skins).
+    percent() {
+      const names = new Set([...found].map((k) => k.split('|')[0]))
+      return ROSTER.filter((c) => names.has(c.name)).length / ROSTER.length
+    },
     // A car the player now owns (record with name + optional variant).
     discover(car) {
       if (!car?.name) return

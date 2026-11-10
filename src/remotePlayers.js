@@ -275,6 +275,20 @@ export function createRemotePlayers(scene, { blockMaterial }) {
       })
       return hit
     },
+    // The closest drawn player within `range` m of `pos` (ground distance): { id, name, x, y, z } or null
+    // (the Trade prompt, game/trade.js).
+    nearest(pos, range) {
+      let best = null
+      let bestD = range
+      for (const [id, r] of remotes) {
+        if (!r.group.visible || !r.placed) continue
+        const d = Math.hypot(r.group.position.x - pos.x, r.group.position.z - pos.z)
+        if (d >= bestD || Math.abs(r.group.position.y - pos.y) > 4) continue
+        bestD = d
+        best = { id, name: r.name || 'Player', x: r.group.position.x, y: r.group.position.y, z: r.group.position.z }
+      }
+      return best
+    },
     update(dt, t, viewer) {
       const players = roster()
       if (!players) {

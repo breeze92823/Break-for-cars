@@ -39,7 +39,8 @@ export const LOBBY = {
     wood: '#c07a45',
     woodDark: '#9a5a2f',
   },
-  road: { halfWidth: 5.2, curb: 1.4, south: 132, north: -132, top: 0.08, curbTop: 0.32 },
+  // beltSpeed (m/s): the lanes are conveyor belts. West lane carries you south, east lane north (the chevron direction).
+  road: { halfWidth: 5.2, curb: 1.4, south: 132, north: -132, top: 0.08, curbTop: 0.32, beltSpeed: 9 },
   northPlaza: { minX: -34, maxX: 34, minZ: -164, maxZ: -132 },
   southPlaza: { minX: -30, maxX: 30, minZ: 132, maxZ: 164 },
   // Plots: width across (x) and depth along the road (z), and the brown border.
@@ -108,16 +109,24 @@ export const BASE = {
   slots: 5, // parking slots per side inside the garage
   // Bays the player has to buy before they can use them (index into the bays: left side 0-4, right side 5-9).
   lockedSlots: [{ bay: 9, label: '10th Slot', price: 4.89e6 }],
+  // Extra floors stacked on the garage, bought in order. Each adds BASE.slots x 2 bays (bay
+  // indices continue: floor 1 = 10-19, floor 2 = 20-29). A storey is building.height tall; the
+  // roof and billboard ride on top of the highest floor bought. The next floor is bought on the
+  // glowing plate where its staircase will stand (hold E).
+  floors: [
+    { label: '2nd Floor', price: 25e6 },
+    { label: '3rd Floor', price: 1.5e9 },
+  ],
+  // The staircase up to each floor runs along the open front of the garage (garage design
+  // units), alternating sides: to floor 1 it rises toward -X from x = -gap to -(gap + run),
+  // to floor 2 toward +X, ... Lego steps over a hidden ramp collider (the player's autostep is
+  // too low for a whole step). Slope = atan(building.height / run), under PHYSICS.maxSlope.
+  stairs: { run: 8, gap: 1, z0: 2.65, z1: 4.85, steps: 30 },
   limitedCars: [
     { car: 'omega', name: 'Omega', bonus: 200, x: -31.5, z: 23, yaw: 0.5 },
     { car: 'bolido', name: 'Bolido', bonus: 275, x: 31.5, z: 23, yaw: -0.6 },
   ],
 }
-
-// The HUD's featured block cycles through these, with their price.
-export const FEATURED_BLOCKS = [
-  { theme: 'hacker', price: 29 },
-]
 
 // Car looks used by the shop, the podium, the hotbar and the parked car.
 // style: 'super' (wedge), 'hyper' (low, big wing), 'sport' (GT coupe), 'coupe' (hybrid)
@@ -164,6 +173,28 @@ export const GAME = {
   reveal: 1.1, // s the car takes to grow out of the broken block
   volume: 0.6,
 }
+// --- New-player tutorial (game/tutorial.js): a banner under the top buttons and white arrows on the
+// ground leading to the next thing to do. Steps (the backend's TUTORIAL_DONE_STEP = steps.length):
+// 0 buy a block off the belt, 1 place it on a bay, 2 break it, 3 earn the first pickaxe's price,
+// 4 buy that pickaxe. Saved in the browser (saveKey) and, for a signed-in player, on the server, so
+// it resumes on any device. A save from before the tutorial existed counts as finished.
+export const TUTORIAL = {
+  saveKey: 'break-for-cars:tutorial:v1',
+  pickaxe: 'iron', // the pickaxe step 3 saves up for; its price is the goal
+  steps: [
+    'Purchase your first lucky block!',
+    'Place lucky block on the slot',
+    'Break lucky block to get your first car!',
+    'Earn {money}/{goal} Cash!',
+    'Purchase your first pickaxe',
+  ],
+  afford: 'You can now afford {name}!', // flashes for `affordFor` s as step 3 ends
+  affordFor: 2.6,
+  // Ground arrows: m apart, m long, m/s they scroll toward the target, the most drawn, how close (m)
+  // to the target they stop, and how close the player may be before they hide.
+  arrows: { spacing: 2.3, size: 1.25, speed: 2.2, max: 64, stopShort: 1.6, hideNear: 3.2, color: '#ffffff', side: '#9fe6ff', outline: '#1b2233' },
+}
+
 // Conveyor "More Luck" upgrade: the magenta pad beside the exit tunnel. Stepping on
 // it asks to buy the next level; each level multiplies a block's spawn weight by
 // luck^tier (tier 0 = Common ... 5 = Secret), so rare blocks show up more often.
@@ -196,6 +227,23 @@ export const CONVEYOR_SKINS = [
   { name: 'Saucer Station', minLevel: 6, wall: '#3c4262', body: '#323854', cap: '#4a5274', frame: '#1c2236', belt: '#181c28', deco: 'ufo' },
   { name: 'Ancient Gearworks', minLevel: 8, wall: '#6e5c3d', body: '#625135', cap: '#7f6b46', frame: '#43361f', belt: '#221d16', deco: 'temple' },
 ]
+// Garage skins (game/baseskins.js, lobby/base.js setSkin): the "Bases" pad on the apron opens
+// the "Base Skins" window. A skin recolours the garage (frame = columns, rails and stair
+// handrails; truss = mullion tint; slab = floors and roof; glass = wall tint; bay / bayTop =
+// parking bays) and multiplies the income of every car parked in it (mult). Each one unlocks
+// for free once `index` (0..1) of the Index's cars are found, or can be bought with money.
+// rainbow: the frame and truss cycle through the hues. Other players see the equipped skin.
+export const GARAGE_SKINS = [
+  { id: 'classic', name: 'Classic Base', mult: 1, index: 0, price: 0, card: '#7a83a8', colors: { frame: '#525a78', truss: '#ffffff', slab: '#878fb2', glass: '#bdf1ff', bay: '#adb5d2', bayTop: '#c4cbe2' } },
+  { id: 'radioactive', name: 'Radioactive Base', mult: 2, index: 0.3, price: 2.5e9, card: '#b4f01e', colors: { frame: '#3c9a12', truss: '#c8ff3a', slab: '#7cc42a', glass: '#d8ff7a', bay: '#9ad84a', bayTop: '#c2f06a' } },
+  { id: 'diamond', name: 'Diamond Base', mult: 2.5, index: 0.45, price: 12e9, card: '#2fc8ff', colors: { frame: '#1678b8', truss: '#bff4ff', slab: '#5cb6e0', glass: '#9ff0ff', bay: '#8ad4f0', bayTop: '#b8ecff' } },
+  { id: 'ruby', name: 'Ruby Base', mult: 3, index: 0.55, price: 50e9, card: '#ff4a5e', colors: { frame: '#a3142c', truss: '#ffb0bc', slab: '#d0485c', glass: '#ffb8c4', bay: '#e07a88', bayTop: '#f4a8b2' } },
+  { id: 'golden', name: 'Golden Base', mult: 4, index: 0.65, price: 250e9, card: '#ffc81a', colors: { frame: '#b8860b', truss: '#fff0a0', slab: '#e0b43a', glass: '#ffe88a', bay: '#e8c860', bayTop: '#f6dc84' } },
+  { id: 'rainbow', name: 'Rainbow Base', mult: 5, index: 0.7, price: 1e12, card: 'linear-gradient(90deg, #ff3b4e, #ffb21a, #ffe14a, #43e83a, #2fc8ff, #8b2cff, #ff3fc8)', rainbow: true, colors: { frame: '#ff3b4e', truss: '#ffffff', slab: '#9aa2c8', glass: '#e0f0ff', bay: '#c8b8f0', bayTop: '#e0d4ff' } },
+]
+// The "Bases" pad on the apron (base-local metres, like CONVEYOR_UPGRADE.pad).
+export const SKINS_PAD = { x: -21, z: 26.4, size: 3.2 }
+
 // Pickaxes Shop (game/pickshop.js): stepping into the Pickaxes Shop ring opens the
 // "Buy Pickaxes" window. Each pickaxe is bought once with money and can be equipped
 // any time after; the equipped one is the tool in your hand and sets the damage
@@ -314,6 +362,14 @@ export const SPIN_WHEEL = {
 
 // Background music (game/music.js) at full volume; Bloxity's music_volume scales it.
 export const MUSIC_VOLUME = 0.16
+// The game's own Settings window (game/settings.js, the gear button beside the calendar):
+// on/off switches saved per device. They sit on top of Bloxity's volume sliders: Music
+// off = silent whatever music_volume says, Sounds off = no effects. Trading is stored
+// for when trade requests exist.
+export const GAME_SETTINGS = {
+  saveKey: 'break-for-cars:settings:v1',
+  defaults: { music: true, sounds: true, trading: true },
+}
 
 // Block rarity -> the cars that can come out of it, and their base $/s.
 export const RARITY_LADDER = ['Common', 'Uncommon', 'Epic', 'Legendary', 'Mythic', 'Secret']

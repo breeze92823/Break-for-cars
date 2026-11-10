@@ -2,7 +2,7 @@ import { inputState } from './input.js'
 import { getYaw, syncYawToPlayer } from './camera.js'
 import { isFirstPerson } from './modes.js'
 import { RAPIER, alpha, onTick, world } from './physics.js'
-import { PHYSICS, PLAYER_DIMS, SPAWN, SPAWN_FACING } from './config.js'
+import { LOBBY, PHYSICS, PLAYER_DIMS, SPAWN, SPAWN_FACING } from './config.js'
 
 // The local player singleton, mutated in place. A kinematic Rapier capsule
 // driven by Rapier's KinematicCharacterController: it slides along walls,
@@ -131,7 +131,18 @@ function step(dt) {
   player.velocity.y += PHYSICS.gravity * dt
   if (player.grounded && !jumped && player.velocity.y < -2) player.velocity.y = -2 // stay pressed to slopes
 
-  const desired = { x: player.velocity.x * dt, y: player.velocity.y * dt, z: player.velocity.z * dt }
+  // Conveyor lanes: standing on the road carries you along the chevrons (west lane south, east lane north).
+  let beltZ = 0
+  if (player.grounded) {
+    const R = LOBBY.road
+    const px = player.position.x
+    const pz = player.position.z
+    if (Math.abs(px) < R.halfWidth && Math.abs(px) > 0.2 && pz > R.north && pz < R.south && player.position.y < R.top + 0.3) {
+      beltZ = (px < 0 ? 1 : -1) * R.beltSpeed
+    }
+  }
+
+  const desired = { x: player.velocity.x * dt, y: player.velocity.y * dt, z: (player.velocity.z + beltZ) * dt }
   controller.computeColliderMovement(collider, desired, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS)
   const moved = controller.computedMovement()
   player.grounded = !jumped && controller.computedGrounded()

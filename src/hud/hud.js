@@ -1,5 +1,5 @@
 import './hud.css'
-import { BLOCK_THEMES, FEATURED_BLOCKS, HUD_DEMO } from '../config.js'
+import { BLOCK_THEMES, HUD_DEMO } from '../config.js'
 import * as bloxity from '../bloxity.js'
 import { onKey } from '../input.js'
 import { fontReady } from '../propkit.js'
@@ -47,7 +47,7 @@ function el(tag, cls, html) {
 }
 const outlined = (text, cls = 'ol') => `<span class="${cls}">${text}</span>`
 
-export function createHud({ onShop, onPlot, onSpin, onCollectAll, onAutoSwing, onSlot, onDaily, onIndex, money: startMoney = 0 }) {
+export function createHud({ onShop, onPlot, onSpin, onCollectAll, onAutoSwing, onSlot, onDaily, onSettings, onIndex, money: startMoney = 0 }) {
   const root = el('div', 'hud')
 
   // --- Top row ---
@@ -68,9 +68,12 @@ export function createHud({ onShop, onPlot, onSpin, onCollectAll, onAutoSwing, o
   const topRight = el('div', 'hud-topright')
   const daily = el('button', 'round-btn', `${SVG.calendar}<span class="badge alert ol-thin" hidden>!</span>`)
   daily.setAttribute('aria-label', 'Daily rewards')
-  // No settings / pause button: Bloxity's own menu has them (platform UI rules).
-  topRight.append(daily)
+  // The game's own Settings (Music / Sounds / Trading switches); Bloxity's portal menu keeps the volume sliders.
+  const gear = el('button', 'round-btn', SVG.gear)
+  gear.setAttribute('aria-label', 'Settings')
+  topRight.append(daily, gear)
   daily.addEventListener('click', () => onDaily?.())
+  gear.addEventListener('click', () => onSettings?.())
 
   // --- Left column ---
   const left = el('div', 'hud-left')
@@ -88,10 +91,6 @@ export function createHud({ onShop, onPlot, onSpin, onCollectAll, onAutoSwing, o
 
   // --- Right column: offers ---
   const right = el('div', 'hud-right')
-  const priceTag = (n) => `<span class="price ol-thin">${SVG.coin}${n}</span>`
-  const featured = el('button', 'offer', `<span class="rays"></span><img alt="">${priceTag(FEATURED_BLOCKS[0].price)}<span class="name ol">${BLOCK_THEMES[FEATURED_BLOCKS[0].theme].name}</span>`)
-  right.append(featured)
-  for (const [b, name] of [[featured, 'Block offer']]) b.addEventListener('click', () => toast(`${name}: coming soon`))
 
   // --- Money ---
   const money = el('div', 'hud-money ol')
@@ -221,22 +220,6 @@ export function createHud({ onShop, onPlot, onSpin, onCollectAll, onAutoSwing, o
     slots[0].querySelector('img').src = toolIcon ?? icons.hammer
     paintCarry()
     free.querySelector('img').src = icons[`car:${HUD_DEMO.freeCar}`]
-    // The featured block offer cycles through the block themes.
-    let f = 0
-    const showFeatured = () => {
-      const spec = FEATURED_BLOCKS[f]
-      featured.querySelector('img').src = icons[`block:${spec.theme}`]
-      featured.querySelector('.price').innerHTML = `${SVG.coin}${spec.price}`
-      featured.querySelector('.name').textContent = BLOCK_THEMES[spec.theme].name
-      featured.classList.remove('swap')
-      void featured.offsetWidth
-      featured.classList.add('swap')
-    }
-    showFeatured()
-    setInterval(() => {
-      f = (f + 1) % FEATURED_BLOCKS.length
-      showFeatured()
-    }, 6000)
   })
 
   // Money counts toward its target.

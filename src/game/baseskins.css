@@ -1,0 +1,62 @@
+/* "Base Skins" window (game/baseskins.js): the Buy Pickaxes frame (pickshop.css) with the blue
+   title bar (windows.css). Each card: garage icon, name, Index requirement, income multiplier,
+   and a stacked price + state button pair on the right. */
+.skin-card {
+  min-height: max(92px, calc(var(--s) * 21));
+}
+.skin-icon {
+  --icon: #1c2236;
+  display: grid;
+  place-items: center;
+}
+.skin-icon svg {
+  width: 88%;
+  height: 88%;
+  filter: drop-shadow(0 calc(var(--s) * 0.3) 0 rgba(0, 0, 0, 0.4));
+}
+.skin-req {
+  margin-top: calc(var(--s) * 0.3);
+  font-size: max(12px, calc(var(--s) * 2.7));
+  line-height: 1.15;
+  color: #c9a3ff;
+}
+.skin-mult {
+  margin-top: calc(var(--s) * 0.4);
+  font-size: max(20px, calc(var(--s) * 5));
+}
+.skin-btns {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--s) * 1.2);
+}
+.skin-btns .lego-btn {
+  width: max(96px, calc(var(--s) * 23));
+  height: max(44px, calc(var(--s) * 6.8));
+  font-size: max(18px, calc(var(--s) * 4.6));
+}
+.skin-btns .lego-btn[hidden] {
+  display: none;
+}
+.lego-btn.purple {
+  --edge: #3d0f8a;
+  background-color: #9a4aff !important;
+}
+.skin-state[data-state='equipped'] {
+  --edge: #3a3d48;
+  background-color: #a7afc2 !important;
+  cursor: default;
+}
+.skin-state[data-state='equipped'] span {
+  font-size: 0.78em;
+}
+
+@media (max-width: 520px) {
+  .skin-btns .lego-btn {
+    width: 84px;
+    font-size: 16px;
+  }
+  .skin-req {
+    font-size: 11px;
+  }
+}

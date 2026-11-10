@@ -1,0 +1,60 @@
+/* Tutorial banner (game/tutorial.js): a dark see-through strip fading out at both ends, under the
+   To Shop / To Plot row, with the next step in big outlined white text. Sits where the announcement
+   banner (hud.css .hud-banner) shows; an announcement draws over it. */
+.tut-banner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--safe-t) + max(54px, var(--s) * 11.2));
+  display: flex;
+  justify-content: center;
+  padding: calc(var(--s) * 1.1) 16px;
+  background: linear-gradient(90deg, transparent 18%, rgba(28, 32, 48, 0.5) 32%, rgba(28, 32, 48, 0.5) 68%, transparent 82%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s;
+  z-index: -1; /* under the game windows (the .game-ui layer's own children) */
+}
+.tut-banner.show {
+  opacity: 1;
+}
+.tut-text {
+  display: inline-block;
+  font-size: max(19px, calc(var(--s) * 4));
+  color: #fff;
+  text-align: center;
+  white-space: nowrap;
+}
+.tut-banner[data-kind='flash'] .tut-text {
+  color: #e8ff3a;
+}
+.tut-banner.pop .tut-text {
+  animation: tut-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+@keyframes tut-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Phone portrait: the top row takes the full width and the spin button drops under its right end,
+   so the banner goes under the row and its text wraps clear of the spin button. */
+@media (max-width: 520px) {
+  .tut-banner {
+    justify-content: flex-start;
+    padding: 8px 12px;
+    background: linear-gradient(90deg, rgba(28, 32, 48, 0.55) 60%, transparent);
+  }
+  .tut-text {
+    max-width: calc(100vw - 110px);
+    white-space: normal;
+    text-align: left;
+    font-size: 18px;
+    line-height: 1.1;
+  }
+}

@@ -72,7 +72,9 @@ export function studify(material, { pitch = LOBBY.stud.pitch, radius = LOBBY.stu
 
 // A plastic brick material with studs on top.
 const brickCache = new Map()
-export function brick(color, { roughness = 0.55, strength = 1, emissive = null, emissiveIntensity = 0 } = {}) {
+// unique: a fresh material, never shared (one that gets recoloured on its own, e.g. a garage skin).
+export function brick(color, { roughness = 0.55, strength = 1, emissive = null, emissiveIntensity = 0, unique = false } = {}) {
+  if (unique) return studify(new MeshStandardMaterial({ color, roughness, metalness: 0, ...(emissive ? { emissive: new Color(emissive), emissiveIntensity } : {}) }), { strength })
   const key = `${color}|${roughness}|${strength}|${emissive}|${emissiveIntensity}`
   let m = brickCache.get(key)
   if (!m) {

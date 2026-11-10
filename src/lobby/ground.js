@@ -36,6 +36,14 @@ function solid(x0, y0, z0, x1, y1, z1, friction = 0.9) {
   addFixed(RAPIER.ColliderDesc.cuboid((x1 - x0) / 2, (y1 - y0) / 2, (z1 - z0) / 2), { x: (x0 + x1) / 2, y: (y0 + y1) / 2, z: (z0 + z1) / 2 }, null, { friction })
 }
 
+// Scrolls the chevrons along the belt direction so the lanes look like moving belts.
+const beltTextures = []
+let beltOffset = 0
+export function updateBelts(dt) {
+  beltOffset = (beltOffset + (dt * LOBBY.road.beltSpeed) / 4.2) % 1
+  for (const { tex } of beltTextures) tex.offset.y = -beltOffset // negative: chevrons slide toward their tips
+}
+
 export function buildGround(scene) {
   const root = new Group()
   root.name = 'ground'
@@ -97,6 +105,7 @@ export function buildGround(scene) {
     plane.receiveShadow = true
     plane.renderOrder = 2
     root.add(plane)
+    beltTextures.push({ tex, side })
   }
   // Centre divider: a thin lighter line of tiles.
   boxSpan(root, brick('#2c3140', { roughness: 0.8 }), -0.18, R.top - 0.02, R.north, 0.18, R.top + 0.025, R.south, { shadow: false })

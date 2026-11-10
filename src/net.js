@@ -8,6 +8,8 @@
 // garage itself. The server says which garage (`plot`) this player owns; main.js moves the game there.
 // The player is identified by their Bloxity game token (verified by the server), never by an id sent
 // from here. Scores go to the server, which reports them to Bloxity's boards under that verified id.
+// The new-player tutorial's step is the one thing the server keeps per account (backend tutorial.ts):
+// asked for once joined (`tutorialSync`), answered with `tutorial` { step }, raised by `tutorial`.
 // Never throws and never blocks play: without a server the game runs alone on the home garage.
 import { Client } from '@colyseus/sdk'
 import { DEV_MODE, LOBBY, NET, SERVER_URL } from './config.js'
@@ -42,6 +44,8 @@ const hooks = {
   base: () => null, // the garage snapshot (game.baseSnapshot)
   stats: () => null, // { cash, income, playtime }
   plot: () => LOBBY.homePlot, // the garage played on now (asked for again on every join)
+  tutorial: () => 0, // the tutorial step reached in this browser (game.tutorialStep)
+  onTutorial: () => {}, // (step) the server's step for this account (game.syncTutorial)
 }
 
 function send(type, payload) {
@@ -86,6 +90,24 @@ function sendIfChanged(key, type, value, wrap = (v) => v) {
 // A pickaxe swing (the others play it) and a Bloxity emote (Bloxity only tells the player who picked it).
 export const sendSwing = () => net.connected && send('swing', {})
 export const sendEmote = (id) => net.connected && send('emote', { id })
+
+// --- Tutorial (backend tutorial.ts; client game/tutorial.js) -------------------------------------------
+// A new step is sent at once; one reached offline goes up with the next join's `tutorialSync`.
+export const sendTutorial = (step) => net.connected && send('tutorial', { step })
+
+// --- Trades (backend trades.ts; client game/trade.js) ------------------------------------------
+// The server brokers requests, offers and accepts; the game swaps the cars. Server messages reach the
+// one handler game/trade.js sets: handler(type, msg) with type tradeSent | tradeDeclined | tradeInvite |
+// tradeInviteEnd | tradeStart | tradeState | tradeDone | tradeEnd.
+const TRADE_EVENTS = ['tradeSent', 'tradeDeclined', 'tradeInvite', 'tradeInviteEnd', 'tradeStart', 'tradeState', 'tradeDone', 'tradeEnd']
+let tradeHandler = null
+export const setTradeHandler = (fn) => (tradeHandler = fn)
+export const emitTrade = (type, msg) => tradeHandler?.(type, msg) // dev: simulate a server message
+export const tradeRequest = (to) => net.connected && send('tradeRequest', { to })
+export const tradeReply = (from, accept) => net.connected && send('tradeReply', { from, accept })
+export const tradeOffer = (items) => net.connected && send('tradeOffer', { items })
+export const tradeAccept = (accepted) => net.connected && send('tradeAccept', { accepted })
+export const tradeCancel = () => net.connected && send('tradeCancel', {})
 
 // --- Roster -------------------------------------------------------------------------
 // The players in the room (sessionId -> PlayerState), or null when not connected.
@@ -139,11 +161,15 @@ function attach(room, relay) {
   net.connected = true
   known = null
   room.onMessage('adReward', (m) => adWaiting?.(m))
+  room.onMessage('tutorial', (m) => Number.isFinite(m?.step) && hooks.onTutorial(m.step))
+  send('tutorialSync', { step: hooks.tutorial() })
+  for (const type of TRADE_EVENTS) room.onMessage(type, (m) => tradeHandler?.(type, m))
   room.onLeave(() => {
     if (net.room !== room) return
     net.room = null
     net.connected = false
     known = null
+    tradeHandler?.('tradeEnd', { reason: 'offline' })
     updateRoom('')
     // An unexpected close (a pod being replaced, a network drop): resolve again and rejoin.
     setTimeout(connect, NET.retry * 1000)
@@ -221,7 +247,7 @@ function tick() {
   }
 }
 
-// pose(), loadout(), base(), stats(), plot(): see `hooks`.
+// pose(), loadout(), base(), stats(), plot(), tutorial(), onTutorial(step): see `hooks`.
 export function initNet(fns = {}) {
   Object.assign(hooks, fns)
   if (!hasServer()) return console.info('[net] no server configured; playing alone')

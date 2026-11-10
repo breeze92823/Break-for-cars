@@ -1,11 +1,11 @@
 // The other players' garages, read-only: for each plot owned by someone else in the room, what stands
 // in each bay (a block with its health, or the car that came out of it with its name, rarity, level
-// and $/s), the bays they bought, their conveyor's look and luck, and their name and income on the
+// and $/s), the bays and floors they bought, their garage skin, their conveyor's look and luck, and their name and income on the
 // billboard, all from the snapshot their game relays (game.js baseSnapshot -> net.js -> backend
 // presence.ts applyBase -> roster `base`). Nothing here can be clicked, bought or collected. Plots
 // nobody holds stand as free garages; the local player's own plot is left to game.js.
 import { BoxGeometry, CanvasTexture, Group, Mesh, Sprite, SpriteMaterial, SRGBColorSpace } from 'three'
-import { BLOCK_THEMES, CONVEYOR_SKINS, CONVEYOR_UPGRADE, GAME, MUTATIONS, RARITY_COLORS, RARITY_LADDER } from './config.js'
+import { BASE, BLOCK_THEMES, CONVEYOR_SKINS, CONVEYOR_UPGRADE, GAME, GARAGE_SKINS, MUTATIONS, RARITY_COLORS, RARITY_LADDER } from './config.js'
 import { mySessionId, roster } from './net.js'
 import { brick } from './lego.js'
 import { fontReady } from './propkit.js'
@@ -15,7 +15,10 @@ import { sparkleField } from './lobby/fx.js'
 import { makeCanvas, paintHpLabel } from './game/paint.js'
 
 const MUT = Object.fromEntries(MUTATIONS.filter((m) => m.mult > 1).map((m) => [m.id, m]))
-const incomeOf = (car) => car.b * Math.pow(GAME.upgrade.incomeGrowth, car.lv - 1)
+// A parked car's $/s, times the owner's garage skin multiplier (the snapshot's `sk`).
+const incomeOf = (car, mult = 1) => car.b * Math.pow(GAME.upgrade.incomeGrowth, car.lv - 1) * mult
+const SKIN_BY_ID = Object.fromEntries(GARAGE_SKINS.map((s) => [s.id, s]))
+const skinOf = (id) => SKIN_BY_ID[id] ?? GARAGE_SKINS[0]
 const rate = (v) => (v < 100 && v % 1 ? v.toFixed(1) : short(v))
 const tierOf = (rarity) => Math.max(0, RARITY_LADDER.indexOf(rarity))
 const skinFor = (level) => CONVEYOR_SKINS.reduce((best, sk, i) => (level >= sk.minLevel ? i : best), 0)
@@ -36,12 +39,12 @@ function dropSprite(s) {
   s.material.dispose()
 }
 
-const carLines = (c) => [
+const carLines = (c, mult) => [
   { size: 60, parts: [{ text: c.n, fill: '#ffffff' }] },
   ...(MUT[c.v] ? [{ size: 52, parts: [{ text: `${c.v} x${MUT[c.v].mult}`, fill: c.v === 'Rainbow' ? ['#ff3b4e', '#ffd21a', '#2dd84a', '#2f9bff', '#b23cff'] : MUT[c.v].color }] }] : []),
   { size: 50, parts: [{ text: c.r, fill: RARITY_COLORS[c.r] ?? '#fff' }] },
   { size: 48, parts: [{ text: `Level ${c.lv}`, fill: '#4aa8ff' }] },
-  { size: 54, parts: [{ text: `$${rate(incomeOf(c))}/s`, fill: '#7dff3a' }] },
+  { size: 54, parts: [{ text: `$${rate(incomeOf(c, mult))}/s`, fill: '#7dff3a' }] },
 ]
 
 // One plot's read-only garage view.
@@ -52,6 +55,7 @@ function createView(base, bursts) {
   const bays = base.bays.map(() => null) // { key, kind, holder, label, ... }
   let unlocked = new Set()
   let lvl = -1
+  let mult = 1 // the owner's garage skin multiplier
 
   // The magenta "More Luck" pad by the exit tunnel, with the owner's conveyor luck.
   const luck = new Group()
@@ -127,7 +131,7 @@ function createView(base, bursts) {
     const tier = tierOf(s.r)
     if (tier >= 2) holder.add(sparkleField({ count: 8 + tier * 3, center: { x: 0, y: 0, z: 0 }, box: { x: 6.5, y: 2.4, z: 3.2 }, rise: 0.5, life: 2.2, size: 0.2, color: RARITY_COLORS[s.r], seed: 300 + i }))
     g.add(holder)
-    const stack = paintStack(carLines(s), { width: 640 })
+    const stack = paintStack(carLines(s, mult), { width: 640 })
     const label = spriteOf(stack.canvas, 2.4)
     label.position.copy(bayBase[i])
     label.position.y += 4.6
@@ -143,7 +147,7 @@ function createView(base, bursts) {
   }
 
   function applyBay(i, s) {
-    const key = s ? JSON.stringify(s) : ''
+    const key = s ? `${JSON.stringify(s)}|${mult}` : '' // a new skin multiplier repaints the car labels
     const v = bays[i]
     if (v?.key === key) return
     // Same block, less health: a hit landed (punch + chips), no rebuild.
@@ -177,6 +181,12 @@ function createView(base, bursts) {
   return {
     // snapshot: the parsed roster `base` (or null for a free garage).
     apply(snap) {
+      // Floors and skin first: bays on a floor that is not shown stay empty.
+      const seen = lvl >= 0 && !!snap // sparks only for a change while watched
+      base.setFloors(Math.max(0, Math.min(BASE.floors.length, snap?.fl | 0)), seen)
+      const skin = skinOf(snap?.sk)
+      base.setSkin(skin.id, seen && base.skin !== skin.id)
+      mult = skin.mult
       const next = new Set(snap?.unl ?? [])
       for (const i of unlocked) if (!next.has(i)) base.lockBay(i)
       for (const i of next) if (!unlocked.has(i)) base.unlockBay(i, lvl >= 0) // sparks only when bought while watched
@@ -191,7 +201,7 @@ function createView(base, bursts) {
       }
       luck.visible = !!snap
       base.setIncome(snap ? Math.round((snap.inc ?? 0) * 100) / 100 : 0)
-      for (let i = 0; i < bays.length; i++) applyBay(i, snap?.bays?.[i] ?? null)
+      for (let i = 0; i < bays.length; i++) applyBay(i, base.bays[i].level <= base.floors ? snap?.bays?.[i] ?? null : null)
     },
     update(dt) {
       for (const v of bays) {
@@ -213,6 +223,9 @@ function createView(base, bursts) {
       for (const i of unlocked) base.lockBay(i)
       unlocked = new Set()
       lvl = -1
+      mult = 1
+      base.setFloors(0)
+      base.setSkin(GARAGE_SKINS[0].id)
       luck.visible = false
       base.setLuck(1)
       base.setConveyorSkin(0, false)
@@ -243,6 +256,12 @@ export function createRemoteBases({ bases, bursts }) {
   }
 
   return {
+    // The local game just left plot i (game.moveTo cleared it): redraw it on the next update.
+    forget(i) {
+      if (!views[i]) return
+      views[i].reset()
+      shown[i] = null
+    },
     // myPlot: the local player's plot (-1 offline: then the home garage is the game's and the rest are free).
     update(dt, myPlot, homePlot) {
       const owners = bases.map(() => null)

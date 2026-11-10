@@ -33,7 +33,11 @@ export function put(parent, geo, mat, x = 0, y = 0, z = 0, shadows = true) {
 
 export const yawQuat = (yaw) => ({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) })
 export function solidBox(hx, hy, hz, x, y, z, yaw = 0) {
-  addFixed(RAPIER.ColliderDesc.cuboid(hx, hy, hz), { x, y, z }, yawQuat(yaw))
+  return addFixed(RAPIER.ColliderDesc.cuboid(hx, hy, hz), { x, y, z }, yawQuat(yaw))
+}
+// A fixed box with any rotation (q: {x, y, z, w}): ramps.
+export function solidBoxQ(hx, hy, hz, x, y, z, q) {
+  return addFixed(RAPIER.ColliderDesc.cuboid(hx, hy, hz), { x, y, z }, q)
 }
 export function solidPole(radius, height, x, z) {
   addFixed(RAPIER.ColliderDesc.cylinder(height / 2, radius), { x, y: height / 2, z })

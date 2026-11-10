@@ -22,9 +22,10 @@ import { disposeAnimator, makeAnimator } from './avatar/animator.js'
 import { createGame } from './game/game.js'
 import * as sfx from './game/audio.js'
 import { setMusic, setMusicVolume } from './game/music.js'
+import { gameSettings, onGameSettings } from './game/settings.js'
 import { playEmote } from './avatar/emotes.js'
 import { createBubble } from './bubble.js'
-import { initNet, myPlot, net, sendEmote, sendSwing, verifyAdReward } from './net.js'
+import { initNet, myPlot, net, sendEmote, sendSwing, sendTutorial, verifyAdReward } from './net.js'
 import { createRemotePlayers } from './remotePlayers.js'
 import { createRemoteBases } from './remoteBases.js'
 import { LEADERBOARDS, NET } from './config.js'
@@ -42,9 +43,10 @@ fpsEl.style.cssText = 'position:fixed;right:calc(env(safe-area-inset-right) + 8p
 document.body.appendChild(fpsEl)
 let adBreak = false // an ad is playing over the game: paused and silent
 const volumes = { master: 0.8, music: 0.8 }
+// Bloxity's sliders x the game's own Settings switches (game/settings.js: Music / Sounds).
 function applyVolumes() {
-  sfx.setVolume(adBreak ? 0 : volumes.master)
-  const music = adBreak ? 0 : volumes.master * volumes.music
+  sfx.setVolume(adBreak || !gameSettings.sounds ? 0 : volumes.master)
+  const music = adBreak || !gameSettings.music ? 0 : volumes.master * volumes.music
   setMusicVolume(music)
   setMusic(music > 0)
 }
@@ -66,6 +68,7 @@ function applySetting(key, value) {
   }
 }
 bloxity.onSetting(applySetting)
+onGameSettings(applyVolumes)
 bloxity.init()
 // Ad breaks (Bloxity starts them, even unasked): pause the game and mute it until the break ends.
 bloxity.onAdBreak((on) => {
@@ -199,6 +202,7 @@ const hud = createHud({
   onAutoSwing: (on) => game?.setAutoSwing(on),
   onSlot: (i) => game?.slot(i),
   onDaily: () => game?.toggleDaily(),
+  onSettings: () => game?.toggleSettings(),
   onIndex: () => game?.toggleIndex(),
 })
 for (const b of lobby.bases) b.onAnnounce((msg) => b === game?.base && hud.announce(msg))
@@ -218,6 +222,8 @@ for (const b of lobby.bases) b.onAnnounce((msg) => b === game?.base && hud.annou
     getAnimator: () => animator,
     lobby, // the event system drives the "Next Event" board
     onSwing: sendSwing,
+    onTutorialStep: sendTutorial, // saved for the account (backend tutorial.ts)
+    nearbyPlayer: () => remotePlayers?.nearest(player.position, 4.5),
     rewardedAd: {
       available: () => net.connected && bloxity.canShowRewarded(),
       // A rewarded ad pays out only once the game server has checked its token with Bloxity.
@@ -241,6 +247,8 @@ initNet({
   base: () => game.baseSnapshot(),
   stats: () => ({ cash: Math.floor(game.money), income: Math.floor(game.income), playtime: Math.floor(playTime / 60) }),
   plot: () => game.base.index,
+  tutorial: () => game.tutorialStep,
+  onTutorial: (step) => game.syncTutorial(step),
 })
 // The server hands out the garages: move the game (and us, when we were home) to ours.
 function followPlot(plot) {
@@ -249,6 +257,8 @@ function followPlot(plot) {
   const prev = game.base
   const home = Math.hypot(player.position.x - prev.spot.x, player.position.z - prev.spot.z) < 70
   game.moveTo(next)
+  // moveTo cleared the garage we left; if someone else holds it, draw theirs again from scratch.
+  remoteBases.forget(prev.index)
   next.setOwner(bloxity.displayName() === 'Offline' ? 'Player' : bloxity.displayName())
   setHome(next.spot.x, next.spot.z, next.spot.facing)
   if (home) goTo(next.spot)
