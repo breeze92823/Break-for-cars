@@ -15,7 +15,7 @@ export const SPAWN = { x: -39.2, y: 0.4, z: 0 } // on the apron of the default g
 // --- Lobby (lobby/*.js): the lego island ---------------------------------------
 // One flat island of studded grass. A two-lane road runs north-south between two
 // plazas: the north plaza holds the three global leaderboards, the south plaza
-// the market stalls (Robux Shop, Pickaxes Shop, Sell), the Fuse Machine, the
+// the market stalls (Pickaxes Shop, Sell), the Fuse Machine, the
 // Spin Wheel and the "Next Event" billboard. Six player plots flank the road,
 // three on each side, each with a garage (lobby/base.js): one per player in a
 // room of six (the server hands them out; offline you play on homePlot).
@@ -63,7 +63,6 @@ export const LOBBY = {
   ],
   // South plaza props (seen from the road: Fuse Machine east, Spin Wheel west).
   stalls: [
-    { x: 10, z: 155, kind: 'robux', label: 'Robux Shop', awning: '#ffd21a', ring: '#ffe14a', npc: 'suit' },
     { x: 0, z: 156, kind: 'pickaxes', label: 'Pickaxes Shop', awning: '#f0202a', ring: '#ff3344', npc: 'miner' },
     { x: -10, z: 155, kind: 'sell', label: 'Sell', awning: '#22d52a', ring: '#33ff55', npc: 'chef' },
   ],

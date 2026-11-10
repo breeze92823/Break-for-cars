@@ -1170,6 +1170,15 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
   // --- Pointer: click / tap = upgrade sign under the pointer, else a swing ----------------------------------
   const raycaster = new Raycaster()
   const ndc = new Vector2()
+  // Centre dot while the cursor is locked: that is where clicks (swing / upgrade signs) aim.
+  const crosshair = document.createElement('div')
+  crosshair.style.cssText =
+    'position:fixed;left:50%;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;' +
+    'background:#fff;box-shadow:0 0 0 2px rgba(0,0,0,.55);pointer-events:none;z-index:5;display:none'
+  document.body.appendChild(crosshair)
+  document.addEventListener('pointerlockchange', () => {
+    crosshair.style.display = document.pointerLockElement ? 'block' : 'none'
+  })
   function act(x, y) {
     if (document.pointerLockElement) {
       // Cursor is captured: aim from the screen centre

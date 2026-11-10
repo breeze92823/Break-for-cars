@@ -14,7 +14,7 @@ import { fontReady, label, neon, solidBox, solidPole } from '../propkit.js'
 import { canvasTex } from './paint.js'
 import { sparkleField } from './fx.js'
 
-// The south plaza: three market stalls (striped awnings, wooden counters, a
+// The south plaza: two market stalls (striped awnings, wooden counters, a
 // shopkeeper each, a glowing ring on the ground to stand in), the "Next Event"
 // countdown billboard behind them, the blue Fuse Machine (chimney smoke,
 // blinking antenna) and the Spin Wheel (blinking rim bulbs; it spins when you
@@ -50,7 +50,6 @@ function ring(color, radius = 1.7) {
 
 // --- Shopkeepers --------------------------------------------------------------------
 const NPC_LOOKS = {
-  suit: { shirt: '#22252e', pants: '#14161c', skin: '#f2c79a', hat: 'top', hatColor: '#121318' },
   miner: { shirt: '#ff8a1c', pants: '#3d4c7a', skin: '#e9b98f', hat: 'hard', hatColor: '#ffd21a' },
   chef: { shirt: '#f4f6fb', pants: '#d9dde8', skin: '#f5d2b0', hat: 'chef', hatColor: '#ffffff' },
 }
@@ -124,7 +123,7 @@ function stall(spec) {
   boxAt(g, wood, W / 2 - 0.5, 0.75, 0, 0.6, 1.1, D - 0.6)
   boxAt(g, woodDark, 0, 1.2, -D / 2 + 0.25, W - 0.6, 0.12, 0.6) // back shelf
   // goods on the counter: a few coloured crates
-  const goods = { robux: ['#3dff6a', '#2ad35a', '#7dff9a'], pickaxes: ['#9aa6c8', '#6fd8ff', '#ffd21a'], sell: ['#ffd21a', '#ffffff', '#f0a020'] }[spec.kind]
+  const goods = { pickaxes: ['#9aa6c8', '#6fd8ff', '#ffd21a'], sell: ['#ffd21a', '#ffffff', '#f0a020'] }[spec.kind]
   goods.forEach((col, i) => boxAt(g, plastic(col, 0.4), -1.4 + i * 1.4, 1.6, D / 2 - 0.15, 0.5, 0.36, 0.5))
   // posts
   for (const x of [-W / 2 + 0.2, W / 2 - 0.2]) {
@@ -150,7 +149,7 @@ function stall(spec) {
   g.add(keeper)
 
   // sign on the counter front
-  const sign = paintSign(spec.label, spec.kind === 'sell' ? '#7dff6a' : spec.kind === 'robux' ? '#ffe14a' : '#ff4a55')
+  const sign = paintSign(spec.label, spec.kind === 'sell' ? '#7dff6a' : '#ff4a55')
   const tex = canvasTex(sign.canvas)
   const plate = new Mesh(new PlaneGeometry(3.6, 0.9), new MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.6, depthWrite: false }))
   plate.position.set(0, 0.78, D / 2 + 0.12)
