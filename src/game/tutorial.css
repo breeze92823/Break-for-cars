@@ -51,7 +51,7 @@
     background: linear-gradient(90deg, rgba(28, 32, 48, 0.55) 60%, transparent);
   }
   .tut-text {
-    max-width: calc(100vw - 110px);
+    max-width: calc(100vw - 130px);
     white-space: normal;
     text-align: left;
     font-size: 18px;

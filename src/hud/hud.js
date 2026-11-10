@@ -221,6 +221,7 @@ export function createHud({ onShop, onPlot, onSpin, onCollectAll, onAutoSwing, o
     }
     top.style.left = `${Math.round(x)}px`
     top.style.marginTop = `${Math.max(0, Math.round(y))}px`
+    root.style.setProperty('--top-bottom', `${Math.round(baseTop + Math.max(0, y) + rowH)}px`)
   }
   bloxity.onReservedAreas((areas) => {
     reserved = areas.map((a) => ({ left: a.left ?? 0, top: a.top ?? 0, width: a.width ?? 0, height: a.height ?? 0 }))

@@ -712,11 +712,26 @@
   .hud-hotbar {
     gap: 3px;
   }
-  .hud-topright {
-    top: auto;
-    bottom: calc(var(--safe-b) + 60px);
-    left: calc(var(--safe-l) + 12px);
-    right: auto;
+  /* Daily rewards + Settings: a row right under the spin wheel (--top-bottom = the bottom
+     of the To Shop / To Plot column, set by hud.js; the wheel is 48px + a 10px gap under it). */
+  .hud .hud-topright,
+  .touch-ui .hud .hud-topright {
+    top: calc(var(--top-bottom, 160px) + 10px + 48px + 8px);
+    bottom: auto;
+    left: auto;
+    right: calc(var(--safe-r) + 8px);
+  }
+}
+/* Very narrow phones (320px): a slimmer Auto Swing so it clears the Daily / Settings row. */
+@media (max-width: 340px) {
+  .hud-left .wide-btn {
+    padding: 0 6px 0 4px;
+    font-size: 12px;
+  }
+  .hud-left .wide-btn svg {
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
   }
 }
 /* Phone portrait with touch controls: the joystick and the jump/run cluster own
@@ -728,11 +743,6 @@
   .touch-ui .hud-money {
     bottom: calc(var(--safe-b) + 290px);
     left: calc(var(--safe-l) + 12px);
-  }
-  .touch-ui .hud .hud-topright {
-    bottom: calc(var(--safe-b) + 286px);
-    left: auto;
-    right: calc(var(--safe-r) + 14px);
   }
   .touch-ui .hud-right {
     bottom: calc(var(--safe-b) + 350px);
