@@ -65,30 +65,9 @@ function applySetting(key, value) {
     postfx?.configure(next)
     setNeonBloom(next.bloom)
     fxBoost.value = next.bloom ? 2.6 : 1.2
-    maxDpr = dprNow = Math.min(window.devicePixelRatio, next.dpr)
     postfx?.setSize(window.innerWidth, window.innerHeight)
     resize()
   }
-}
-// Adaptive resolution: when the frame rate stays low the render scale drops a step (down to
-// 0.75x), and climbs back when there is headroom. maxDpr is the preset's ceiling.
-let maxDpr = 1
-let dprNow = 1
-const dprWindow = { t: 0, frames: 0 }
-function adaptResolution(real) {
-  dprWindow.t += real
-  dprWindow.frames++
-  if (dprWindow.t < 2) return
-  const f = dprWindow.frames / dprWindow.t
-  dprWindow.t = dprWindow.frames = 0
-  const floor = Math.min(0.75, maxDpr)
-  const next = f < 40 ? Math.max(floor, dprNow - 0.15) : f > 57 ? Math.min(maxDpr, dprNow + 0.1) : dprNow
-  if (Math.abs(next - dprNow) < 0.01) return
-  dprNow = next
-  renderer.setPixelRatio(dprNow)
-  postfx.setSize(window.innerWidth, window.innerHeight)
-  renderer.setSize(window.innerWidth, window.innerHeight)
-  fxView.value = (dprNow * window.innerHeight) / 2 / Math.tan((camera.fov * Math.PI) / 360)
 }
 bloxity.onSetting(applySetting)
 onGameSettings(applyVolumes)
@@ -111,8 +90,7 @@ renderer.toneMapping = ACESFilmicToneMapping
 renderer.toneMappingExposure = RENDER.exposure
 renderer.shadowMap.enabled = preset.shadows
 renderer.shadowMap.type = COARSE_POINTER ? PCFShadowMap : PCFSoftShadowMap // soft filtering costs a lot on phones
-maxDpr = dprNow = Math.min(window.devicePixelRatio, preset.dpr)
-renderer.setPixelRatio(dprNow)
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, preset.dpr))
 document.body.appendChild(renderer.domElement)
 installInput(() => bloxity.showMenu(), renderer.domElement) // Esc opens the portal menu
 
@@ -346,7 +324,6 @@ function frame(stepDt) {
     postfx.render()
     return
   }
-  if (!document.hidden) adaptResolution(real)
 
   stepPhysics(dt) // runs the player controller + world at the fixed rate, interpolates bodies
   interpolatePlayer()
