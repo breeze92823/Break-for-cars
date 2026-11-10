@@ -423,7 +423,12 @@ export const PLAYER_DIMS = { radius: 0.75, height: 1.8 } // capsule the characte
 
 // --- Look ------------------------------------------------------------------
 export const RENDER = { exposure: 1.0 }
-export const FOG = { near: 320, far: 1100 }
+// Fog hides the far island and sea, so nothing is drawn past it (CAMERA.far is just beyond the
+// sky dome, 500 m). Phones get a shorter view.
+const COARSE = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches
+export const FOG = COARSE ? { near: 80, far: 300 } : { near: 130, far: 430 }
+// Garages further than `near` m from the player drop to a cheap version (no shadows, no animation).
+export const DETAIL = { baseNear: COARSE ? 95 : 130, baseHysteresis: 12 }
 // The two lighting moods lighting.js blends between (key N toggles).
 export const TIME_OF_DAY = {
   transition: 2.5, // s to blend day <-> night
@@ -461,7 +466,7 @@ export const TIME_OF_DAY = {
   },
 }
 export const LIGHT = {
-  shadowRange: 40, // half-width of the sun's shadow box around the player
+  shadowRange: COARSE ? 28 : 40, // half-width of the sun's shadow box around the player
   lampColor: '#ffb35c',
   lampDistance: 22,
 }
@@ -495,7 +500,7 @@ export const NEON = { k: 3.5, plainMax: 1.2 }
 // is a full-screen multi-pass blur, so it stays off on phones).
 export const COARSE_POINTER = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches
 export const DEFAULT_GRAPHICS = COARSE_POINTER ? 'Medium' : 'High'
-export const MOBILE_GRAPHICS_CAP = { dpr: 1.5, shadowMap: 1024, particles: 0.6 }
+export const MOBILE_GRAPHICS_CAP = { dpr: 1.25, shadowMap: 1024, particles: 0.5 }
 
 // The preset to render with on this device.
 export function graphicsPreset(name) {
@@ -516,7 +521,7 @@ export const TOUCH = {
 export const CAMERA = {
   fov: 70,
   near: 0.1,
-  far: 1200,
+  far: 560,
   startPitch: 0.14, // radians above the horizon (low chase cam)
   minPitch: -0.35,
   maxPitch: 1.25,

@@ -1,5 +1,6 @@
-import { Group, IcosahedronGeometry, Mesh, MeshLambertMaterial, MeshPhysicalMaterial, PlaneGeometry, Vector2 } from 'three'
-import { WATER } from './config.js'
+import { Group, IcosahedronGeometry, Mesh, MeshLambertMaterial, MeshPhysicalMaterial, MeshStandardMaterial, PlaneGeometry, Vector2 } from 'three'
+import { bake } from './bake.js'
+import { COARSE_POINTER, WATER } from './config.js'
 import { mulberry32, paintWaterNormal, toTexture } from './textures.js'
 
 // The sea round the island and puffy clouds in the sky (the island itself is
@@ -9,7 +10,7 @@ import { mulberry32, paintWaterNormal, toTexture } from './textures.js'
 
 function makeClouds() {
   const rand = mulberry32(2024)
-  const geo = new IcosahedronGeometry(1, 3)
+  const geo = new IcosahedronGeometry(1, COARSE_POINTER ? 1 : 2)
   const mat = new MeshLambertMaterial({ color: '#ffffff', emissive: '#dcebff', emissiveIntensity: 0.62, fog: false })
   const group = new Group()
   for (let i = 0; i < 22; i++) {
@@ -34,7 +35,8 @@ function makeClouds() {
     cloud.lookAt(0, cloud.position.y, 0)
     group.add(cloud)
   }
-  return group
+  group.updateMatrixWorld(true)
+  return bake(group) // ~200 puffs -> one draw call
 }
 
 // The sea around the land and the clouds in the sky.
@@ -45,16 +47,13 @@ export function createWorld(scene) {
   const normalB = toTexture(ripples, { repeat: WATER.size / 37 })
   const sea = new Mesh(
     new PlaneGeometry(WATER.size, WATER.size),
-    new MeshPhysicalMaterial({
+    new (COARSE_POINTER ? MeshStandardMaterial : MeshPhysicalMaterial)({
       color: WATER.color,
       roughness: 0.3,
       metalness: 0,
       normalMap: normalA,
       normalScale: new Vector2(0.3, 0.3),
-      clearcoat: 1,
-      clearcoatRoughness: 0.08,
-      clearcoatNormalMap: normalB,
-      clearcoatNormalScale: new Vector2(0.5, 0.5),
+      ...(COARSE_POINTER ? {} : { clearcoat: 1, clearcoatRoughness: 0.08, clearcoatNormalMap: normalB, clearcoatNormalScale: new Vector2(0.5, 0.5) }),
       transparent: true,
       opacity: 0.94,
     }),
@@ -69,7 +68,7 @@ export function createWorld(scene) {
     update(dt, elapsed) {
       // One ripple tile is 14 m (A) / 37 m (B); v runs toward -Z.
       normalA.offset.set(elapsed * 0.012, elapsed * 0.02)
-      normalB.offset.set(-elapsed * 0.008, elapsed * 0.005)
+      if (!COARSE_POINTER) normalB.offset.set(-elapsed * 0.008, elapsed * 0.005)
     },
   }
 }

@@ -1,5 +1,5 @@
 import { Group } from 'three'
-import { LOBBY } from '../config.js'
+import { DETAIL, LOBBY } from '../config.js'
 import { buildGround, updateBelts } from './ground.js'
 import { buildNature } from './nature.js'
 import { buildLeaderboards } from './leaderboards.js'
@@ -59,6 +59,9 @@ export function buildLobby(scene, preset) {
       boards.setNight(night)
       plaza.setNight(night)
       for (const b of bases) {
+        // far garages drop to the cheap version (with a margin so they do not flicker at the edge)
+        const d = Math.hypot(playerPos.x - b.spot.x, playerPos.z - b.spot.z)
+        b.setDetail(b.detail ? d < DETAIL.baseNear + DETAIL.baseHysteresis : d < DETAIL.baseNear - DETAIL.baseHysteresis)
         b.setNight(night)
         b.update(dt, elapsed)
       }

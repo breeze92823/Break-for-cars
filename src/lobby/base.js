@@ -846,6 +846,8 @@ export function buildBase(scene, plot, bursts) {
   // own (a floor shows once bought, the roof moves up).
   for (const o of [...blocks.map((b) => b.holder), ...Object.values(decos)]) live.add(o)
   const sections = [...levels.map((l) => l.group), roof]
+  let detail = true
+  const bakedCasters = [] // switched off in the far version (setDetail)
   const bakeSection = (root, skip) => {
     const casters = []
     const flat = []
@@ -858,6 +860,7 @@ export function buildBase(scene, plot, bursts) {
     for (const [list, cast] of [[casters, true], [flat, false]]) {
       if (!list.length) continue
       const baked = bakeMeshes(list, root, cast)
+      if (cast) baked.traverse((o) => o.isMesh && bakedCasters.push(o))
       baked.traverse((o) => o.isMesh && (o.receiveShadow = true))
       for (const m of list) m.parent.remove(m)
       root.add(baked)
@@ -1044,7 +1047,19 @@ export function buildBase(scene, plot, bursts) {
       for (const l of lights) l.intensity = 34 + n * 60
       padGlow.intensity = 14 + n * 30
     },
+    // Near (true) = full garage; far (false) = no shadows, no animation, no belt blocks. The
+    // player's own garage is always near (main loop of lobby/index.js decides).
+    setDetail(on) {
+      if (on === detail) return
+      detail = on
+      for (const m of bakedCasters) m.castShadow = on
+      for (const b of blocks) if (!on) b.holder.visible = false
+    },
+    get detail() {
+      return detail
+    },
     update(dt, elapsed) {
+      if (!detail) return
       chevTex.offset.x -= (dt * Cv.speed) / chevLen
       for (const sp of spinners) {
         if (!sp.obj.parent.visible) continue
