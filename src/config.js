@@ -1,36 +1,24 @@
 // Every tunable constant lives here; the rest of src/ holds no theme values.
 
 // --- Identity -------------------------------------------------------------
-export const GAME_SLUG = 'bowling-roll' // slug registered on bloxity.io
-export const GAME_TITLE = 'Bowling Roll'
+export const GAME_SLUG = 'break-for-cars' // slug registered on bloxity.io
+export const GAME_TITLE = 'Break for Cars'
 
 // Forces the Bloxity SDK and avatar CDN to be treated as unavailable (see .env.example).
 export const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true'
 
 // --- World (metres: +X east, +Z south, +Y up) -------------------------------
 export const GROUND_Y = 0
-// The ground (world.js): one convex slab of land in a sea. The shoreline sweeps from
-// the front edge (-Z) back toward +Z on both wings.
-export const BEACH = {
-  front: -46, // z of the shoreline at the front edge
-  back: 90, // z of the back edge
-  halfWidth: 75, // x extent of the wings
-  wingZ: 24, // z of the shoreline at the far left/right ends
-  gateEdge: 21.5, // half-width of the straight shoreline at the front edge
-  depth: 4, // slab thickness above the sea floor
-  tile: 18, // m per sand texture tile
-  fenceHeight: 3, // invisible wall around the sand so nobody walks into the sea
-}
 export const WATER = { level: -1.4, size: 1400, color: '#14a6f0', shallow: '#6fe6ff' }
-export const SPAWN = { x: 0, y: 0.4, z: 40 }
+export const SPAWN = { x: -39.2, y: 0.4, z: 0 } // on the apron of the default garage (LOBBY.plots[LOBBY.homePlot])
 
 // --- Lobby (lobby/*.js): the lego island ---------------------------------------
 // One flat island of studded grass. A two-lane road runs north-south between two
 // plazas: the north plaza holds the three global leaderboards, the south plaza
 // the market stalls (Robux Shop, Pickaxes Shop, Sell), the Fuse Machine, the
 // Spin Wheel and the "Next Event" billboard. Six player plots flank the road,
-// three on each side; until bases are built they are empty grey studded slabs
-// in a brown border.
+// three on each side, each with a garage (lobby/base.js): one per player in a
+// room of six (the server hands them out; offline you play on homePlot).
 export const LOBBY = {
   stud: { pitch: 0.5, radius: 0.3 }, // m between studs; stud radius as a fraction of the pitch
   island: { minX: -128, maxX: 128, minZ: -196, maxZ: 204, depth: 7, fenceHeight: 4 },
@@ -53,18 +41,19 @@ export const LOBBY = {
   },
   road: { halfWidth: 5.2, curb: 1.4, south: 132, north: -132, top: 0.08, curbTop: 0.32 },
   northPlaza: { minX: -34, maxX: 34, minZ: -164, maxZ: -132 },
-  southPlaza: { minX: -42, maxX: 42, minZ: 132, maxZ: 172 },
+  southPlaza: { minX: -30, maxX: 30, minZ: 132, maxZ: 164 },
   // Plots: width across (x) and depth along the road (z), and the brown border.
-  plotW: 50,
-  plotD: 60,
+  plotW: 80,
+  plotD: 70,
   plotBorder: 2.6,
+  homePlot: 1, // the garage played on until the server assigns one (and offline)
   plots: [
-    { x: -46, z: -74 },
-    { x: -46, z: 0 },
-    { x: -46, z: 74 },
-    { x: 46, z: -74 },
-    { x: 46, z: 0 },
-    { x: 46, z: 74 },
+    { x: -61, z: -82 },
+    { x: -61, z: 0 },
+    { x: -61, z: 82 },
+    { x: 61, z: -82 },
+    { x: 61, z: 0 },
+    { x: 61, z: 82 },
   ],
   leaderboards: [
     { x: -17, z: -156, yaw: 0.18, kind: 'cash' },
@@ -73,17 +62,16 @@ export const LOBBY = {
   ],
   // South plaza props (seen from the road: Fuse Machine east, Spin Wheel west).
   stalls: [
-    { x: 11, z: 162, kind: 'robux', label: 'Robux Shop', awning: '#ffd21a', ring: '#ffe14a', npc: 'suit' },
-    { x: 0, z: 163, kind: 'pickaxes', label: 'Pickaxes Shop', awning: '#f0202a', ring: '#ff3344', npc: 'miner' },
-    { x: -11, z: 162, kind: 'sell', label: 'Sell', awning: '#22d52a', ring: '#33ff55', npc: 'chef' },
+    { x: 10, z: 155, kind: 'robux', label: 'Robux Shop', awning: '#ffd21a', ring: '#ffe14a', npc: 'suit' },
+    { x: 0, z: 156, kind: 'pickaxes', label: 'Pickaxes Shop', awning: '#f0202a', ring: '#ff3344', npc: 'miner' },
+    { x: -10, z: 155, kind: 'sell', label: 'Sell', awning: '#22d52a', ring: '#33ff55', npc: 'chef' },
   ],
-  eventBoard: { x: 0, z: 178, yaw: Math.PI, every: 600 }, // countdown repeats every `every` s
-  fuseMachine: { x: 25, z: 156, yaw: -Math.PI / 2 - 0.25, needs: 4 },
-  spinWheel: { x: -25, z: 155, yaw: Math.PI / 2 + 0.3 },
+  eventBoard: { x: 0, z: 169, yaw: Math.PI, every: 600 }, // countdown repeats every `every` s
+  fuseMachine: { x: 21, z: 147, yaw: -Math.PI / 2 - 0.25, needs: 4 },
+  spinWheel: { x: -21, z: 146, yaw: Math.PI / 2 + 0.3 },
   // Teleport targets for the HUD buttons ({x, z, facing}); facing PI = north, 0 = south.
   spots: {
-    shop: { x: 0, z: 146, facing: 0 },
-    plot: { x: -16, z: 0, facing: -Math.PI / 2 }, // edge of the first plot until plots are assigned
+    shop: { x: 0, z: 140, facing: 0 },
   },
   trees: 44,
   pines: 18,
@@ -93,18 +81,42 @@ export const LOBBY = {
 }
 
 // Block themes: the conveyor's mystery blocks and the HUD's featured block offer.
+// rarity/price label the block on the belt; weight = how often the conveyor spawns it.
 export const BLOCK_THEMES = {
-  gold: { name: 'Lucky Block', base: '#ffcf1f', edge: '#e08a00', mark: '#ffffff', ink: '#c25e00', glow: '#ffd84a' },
-  cyan: { name: 'Ice Block', base: '#3fe3ff', edge: '#0a8fd8', mark: '#ffffff', ink: '#075a9e', glow: '#6ff2ff' },
-  hacker: { name: 'Hacker Block', base: '#0d1a10', edge: '#21ff4a', mark: '#21ff4a', ink: '#003b0c', glow: '#3dff5e', grid: true },
-  divine: { name: 'Divine Block', base: '#ffe27a', edge: '#ffffff', mark: '#ffffff', ink: '#d88a00', glow: '#fff1a8' },
-  galaxy: { name: 'Galaxy Block', base: '#6a1fd8', edge: '#d65cff', mark: '#ffffff', ink: '#2a0870', glow: '#c27bff', stars: true },
+  // hp is sized against PICKAXES: with the pickaxe you can afford when a block
+  // shows up it takes ~10-30 hits; with the starter Wooden Pickaxe the rare ones are a slog.
+  gold: { name: 'Lucky Block', rarity: 'Common', price: 100, hp: 1500, weight: 60, base: '#ffcf1f', edge: '#e08a00', mark: '#ffffff', ink: '#c25e00', glow: '#ffd84a' },
+  cyan: { name: 'Ice Block', rarity: 'Uncommon', price: 450, hp: 4000, weight: 14, base: '#3fe3ff', edge: '#0a8fd8', mark: '#ffffff', ink: '#075a9e', glow: '#6ff2ff' },
+  galaxy: { name: 'Galaxy Block', rarity: 'Epic', price: 5000, hp: 15000, weight: 6, base: '#6a1fd8', edge: '#d65cff', mark: '#ffffff', ink: '#2a0870', glow: '#c27bff', stars: true },
+  hacker: { name: 'Hacker Block', rarity: 'Legendary', price: 25000, hp: 50000, weight: 4, base: '#0d1a10', edge: '#21ff4a', mark: '#21ff4a', ink: '#003b0c', glow: '#3dff5e', grid: true },
+  divine: { name: 'Divine Block', rarity: 'Mythic', price: 120000, hp: 200000, weight: 3, base: '#ffe27a', edge: '#ffffff', mark: '#ffffff', ink: '#d88a00', glow: '#fff1a8' },
+  cosmic: { name: 'Cosmic Lucky Block', rarity: 'Secret', price: 1e6, hp: 1e6, weight: 1, base: '#ff2f8e', edge: '#2b0b5c', mark: '#ffffff', ink: '#5a0a3a', glow: '#ff6ad5', stars: true, announce: true },
 }
+export const RARITY_COLORS = { Common: '#c9cfdc', Uncommon: '#5dff4a', Rare: '#3c9cff', Epic: '#c43cff', Legendary: '#ffb21a', Mythic: '#ff3b4e', Secret: '#ff6ad5' }
+
+// The player's base (lobby/base.js), in plot-local metres: +Z points at the road,
+// X runs along it. A glass showroom garage at the back, a grey studded apron in
+// front, a grass strip, then the block conveyor along the road-side edge with a
+// tunnel box at each end, and the two limited cars parked beside the conveyor.
+export const BASE = {
+  // design size of the garage; it is drawn garageScale times bigger, pushed back by garageOffsetZ
+  building: { minX: -12, maxX: 12, minZ: -21, maxZ: 5, height: 6.6, floor: 0.4 },
+  garageScale: 2,
+  garageOffsetZ: 6,
+  apron: { minX: -30, maxX: 30, minZ: -39, maxZ: 28.5 },
+  conveyor: { z: 33, from: -28, to: 28, belt: 2.6, wall: 0.8, wallHeight: 1.1, speed: 2.4, spacing: 7, box: { length: 4.2, width: 5.6, height: 3.3 } },
+  slots: 5, // parking slots per side inside the garage
+  // Bays the player has to buy before they can use them (index into the bays: left side 0-4, right side 5-9).
+  lockedSlots: [{ bay: 9, label: '10th Slot', price: 4.89e6 }],
+  limitedCars: [
+    { car: 'omega', name: 'Omega', bonus: 200, x: -31.5, z: 23, yaw: 0.5 },
+    { car: 'bolido', name: 'Bolido', bonus: 275, x: 31.5, z: 23, yaw: -0.6 },
+  ],
+}
+
 // The HUD's featured block cycles through these, with their price.
 export const FEATURED_BLOCKS = [
   { theme: 'hacker', price: 29 },
-  { theme: 'divine', price: 4 },
-  { theme: 'galaxy', price: 14 },
 ]
 
 // Car looks used by the shop, the podium, the hotbar and the parked car.
@@ -117,25 +129,205 @@ export const CARS = {
   redSport: { body: '#e8141b', accent: '#1b1b1f', style: 'super', rim: '#25262b' },
   blueCoupe: { body: '#8d99b4', accent: '#1b2533', style: 'coupe', rim: '#2c3442', trim: '#3f8cff' },
   orangeHyper: { body: '#ff4a12', accent: '#141418', style: 'hyper', rim: '#1f1f24' },
+  omega: { body: '#ff3d0a', accent: '#0f0f12', style: 'hyper', rim: '#18181c', neon: '#ff7a2a' },
   greenSuper: { body: '#7ee81c', accent: '#16181c', style: 'super', rim: '#25262b' },
   bolido: { body: '#11151d', accent: '#0a0d12', style: 'hyper', rim: '#151a22', neon: '#18e8ff' },
 }
-// Placeholder HUD state until the economy exists (matches the reference layout).
+// Placeholder HUD state for the parts that have no game rules yet (spins, offers).
 export const HUD_DEMO = {
-  money: 517.15e9,
   spins: 1,
-  hotbar: [
-    { car: 'yellowSuper', price: 3.94e6 },
-    { car: 'whiteHyper', price: 26e6 },
-    { car: 'goldenCoupe', price: 16, tag: 'Golden' },
-    { car: 'silverSport', price: 2.67e6 },
-    { car: 'redSport', price: 800 },
-    { car: 'blueCoupe', price: 48.1e3 },
-  ],
   freeCar: 'blueCoupe',
   offers: { starterPack: 19, opPickaxe: 159 },
 }
-export const SPAWN_FACING = Math.PI // yaw the character faces on spawn (PI = toward -Z)
+// --- Game rules (game/*.js): buy a block off the belt, carry it into the garage,
+// place it on a free bay, break it with the hammer, and the car inside earns money
+// into that bay's collect pad until the player steps on it.
+export const GAME = {
+  saveKey: 'break-for-cars:save:v1',
+  startMoney: 250,
+  autosave: 5, // s between saves
+  offlineCap: 3600, // s of income the pads keep earning while the game is closed
+  buyHold: 0.45, // s E (or the prompt) is held to buy a block
+  removeHold: 0.35, // s E is held on a parked car to take it off its bay into the hotbar
+  removeReach: 0.6, // garage units from a car's bay for its Remove prompt
+  inventory: 7, // cars the hotbar holds (slots 2-8; the carried block takes the next one)
+  buyReach: 4.8, // m from the player to a belt block for its Buy prompt (the belt wall keeps you ~3 m off)
+  placeReach: 1.4, // garage units from a bay's edge for its Place prompt
+  hitReach: 3.4, // m from the player to a placed block's side for a swing to land
+  swing: { duration: 0.34, impact: 0.19 }, // s, s into the swing the head lands (damage per hit = the equipped pickaxe's)
+  luckyChance: 0.1, // a block sometimes holds a car one rarity up
+  incomeSpread: [0.85, 1.3], // a car's base income = rarity income x random in this range
+  upgrade: { costFactor: 12, costGrowth: 1.35, incomeGrowth: 1.22, maxLevel: 50 },
+  sellBack: 0.5, // fraction of the block price + upgrade spend a sold car returns
+  placedSize: 2.3, // m edge of a block standing on a bay
+  carScale: 1.55,
+  reveal: 1.1, // s the car takes to grow out of the broken block
+  volume: 0.6,
+}
+// Conveyor "More Luck" upgrade: the magenta pad beside the exit tunnel. Stepping on
+// it asks to buy the next level; each level multiplies a block's spawn weight by
+// luck^tier (tier 0 = Common ... 5 = Secret), so rare blocks show up more often.
+// cost = price to reach that level; priced along the block prices so each level
+// is a goal for the cars you own at that point.
+export const CONVEYOR_UPGRADE = {
+  pad: { x: 21, z: 26.4, size: 3.2 }, // base-local metres (+Z = road side, X along the belt)
+  levels: [
+    { luck: 1, cost: 0 },
+    { luck: 1.15, cost: 750 },
+    { luck: 1.3, cost: 3500 },
+    { luck: 1.45, cost: 12000 },
+    { luck: 1.6, cost: 40000 },
+    { luck: 1.8, cost: 125000 },
+    { luck: 2.0, cost: 400000 },
+    { luck: 2.25, cost: 1.2e6 },
+    { luck: 2.5, cost: 4e6 },
+    { luck: 2.8, cost: 12e6 },
+  ],
+}
+// The conveyor's look evolves with its upgrade level (lobby/base.js setConveyorSkin):
+// the highest skin whose minLevel <= the level (0-based) is shown. Colours tint
+// the walls / tunnel bodies / caps / mouth frames / belt; deco switches on that
+// tier's extra props (none, lime trim, neon edges + antenna orbs, UFO saucers,
+// bronze gear towers with glowing domes).
+export const CONVEYOR_SKINS = [
+  { name: 'Concrete', minLevel: 0, wall: '#878fb2', body: '#878fb2', cap: '#98a0c2', frame: '#525a78', belt: '#262b38', deco: null },
+  { name: 'Lime Trim', minLevel: 2, wall: '#8a93b6', body: '#7f88ad', cap: '#4fd62a', frame: '#2f9f1c', belt: '#252a36', deco: 'trim' },
+  { name: 'Neon Brick', minLevel: 4, wall: '#3fd61f', body: '#38c81c', cap: '#2aa515', frame: '#1b8fb0', belt: '#1f2430', deco: 'neon' },
+  { name: 'Saucer Station', minLevel: 6, wall: '#3c4262', body: '#323854', cap: '#4a5274', frame: '#1c2236', belt: '#181c28', deco: 'ufo' },
+  { name: 'Ancient Gearworks', minLevel: 8, wall: '#6e5c3d', body: '#625135', cap: '#7f6b46', frame: '#43361f', belt: '#221d16', deco: 'temple' },
+]
+// Pickaxes Shop (game/pickshop.js): stepping into the Pickaxes Shop ring opens the
+// "Buy Pickaxes" window. Each pickaxe is bought once with money and can be equipped
+// any time after; the equipped one is the tool in your hand and sets the damage
+// per hit. Prices follow the economy: each one is roughly what the cars you own
+// when you reach the matching block rarity earn in a few minutes.
+// look: head / tip (the pick's points) / handle colours; style 'pick' (curved
+// head) or 'hammer' (block head); span = head width; glow = neon core; stripes =
+// alternating head/tip segments; crown = little crown on top.
+export const PICKAXES = [
+  { id: 'wooden', name: 'Wooden Pickaxe', rarity: 'Common', damage: 250, price: 0, look: { head: '#8a6448', tip: '#a87e5c', handle: '#c9a07a' } },
+  { id: 'iron', name: 'Iron Pickaxe', rarity: 'Common', damage: 400, price: 1000, look: { head: '#e3e8f0', tip: '#ffffff', handle: '#c9a07a' } },
+  { id: 'golden', name: 'Golden Pickaxe', rarity: 'Uncommon', damage: 700, price: 8000, look: { head: '#ffe43a', tip: '#fff7a8', handle: '#c9a07a' } },
+  { id: 'diamond', name: 'Diamond Pickaxe', rarity: 'Uncommon', damage: 1200, price: 25000, look: { head: '#46eeff', tip: '#c8fbff', handle: '#c9a07a' } },
+  { id: 'emerald', name: 'Emerald Pickaxe', rarity: 'Rare', damage: 2000, price: 60000, look: { head: '#22e45e', tip: '#a8ffc0', handle: '#a8784f' } },
+  { id: 'ruby', name: 'Ruby Pickaxe', rarity: 'Rare', damage: 3200, price: 150000, look: { head: '#ff2448', tip: '#ff9aaa', handle: '#5a3a2a' } },
+  { id: 'lava', name: 'Lava Pickaxe', rarity: 'Epic', damage: 5000, price: 400000, look: { head: '#ff6a12', tip: '#ffd04a', handle: '#3a1a14', glow: '#ff5a00' } },
+  { id: 'amethyst', name: 'Amethyst Pickaxe', rarity: 'Epic', damage: 8000, price: 1e6, look: { head: '#a43cff', tip: '#e6b0ff', handle: '#3a2a4a' } },
+  { id: 'crystal', name: 'Crystal Pickaxe', rarity: 'Legendary', damage: 12500, price: 2.5e6, look: { head: '#cc66ff', tip: '#ffb8ff', handle: '#e48eff' } },
+  { id: 'azure', name: 'Azure Pickaxe', rarity: 'Legendary', damage: 20000, price: 6e6, look: { head: '#52dcff', tip: '#d0f8ff', handle: '#2a8ad8', span: 1.25 } },
+  { id: 'shadow', name: 'Shadow Pickaxe', rarity: 'Mythic', damage: 32000, price: 15e6, look: { head: '#2a2a36', tip: '#6c6c84', handle: '#1a1a20', glow: '#9a4aff' } },
+  { id: 'radioactive', name: 'Radioactive Pickaxe', rarity: 'Mythic', damage: 50000, price: 40e6, look: { head: '#b4ff26', tip: '#f0ff8a', handle: '#34d026', glow: '#c8ff3a', span: 1.2 } },
+  { id: 'null', name: 'Null Pickaxe', rarity: 'Cosmic', damage: 80000, price: 100e6, look: { head: '#f4f6fb', tip: '#1b1c22', handle: '#1b1c22', stripes: true, span: 1.2 } },
+  { id: 'plasma', name: 'Plasma Hammer', rarity: 'Cosmic', damage: 125000, price: 250e6, look: { head: '#e03aff', tip: '#ff9aff', handle: '#b62ad0', glow: '#ff4aff', style: 'hammer' } },
+  { id: 'galaxy', name: 'Galaxy Pickaxe', rarity: 'Cosmic', damage: 200000, price: 650e6, look: { head: '#9a4aff', tip: '#ff9aff', handle: '#7a3ad8', glow: '#c08aff', span: 1.2 } },
+  { id: 'bloodmoon', name: 'Blood Moon Pickaxe', rarity: 'Secret', damage: 320000, price: 1.6e9, look: { head: '#c8101e', tip: '#ff4040', handle: '#4a080e', glow: '#ff2030', span: 1.3 } },
+  { id: 'divine', name: 'Divine Pickaxe', rarity: 'Celestial', damage: 500000, price: 4e9, look: { head: '#fff1a0', tip: '#ffffff', handle: '#ffe14a', glow: '#fff8c0', span: 1.25 } },
+  { id: 'king', name: 'King Pickaxe', rarity: 'Godly', damage: 800000, price: 12e9, look: { head: '#ffcf1f', tip: '#ff3a2a', handle: '#e8141b', glow: '#2af0ff', crown: true } },
+  { id: 'demonic', name: 'Demonic Pickaxe', rarity: 'Infernal', damage: 1.3e6, price: 35e9, look: { head: '#1c0608', tip: '#ff2a12', handle: '#7a0a0a', glow: '#ff3a12', span: 1.35, stripes: true } },
+]
+// Shop card colours per pickaxe rarity: card = background (CSS), icon = the
+// icon well, text = rarity label colour, edge = card border.
+export const PICKAXE_RARITIES = {
+  Common: { card: '#e7eaf1', icon: '#5b5f6b', text: '#eef0f5', edge: '#3a3d48' },
+  Uncommon: { card: '#3ed42c', icon: '#1d5c16', text: '#2b9d1a', edge: '#145a0e' },
+  Rare: { card: '#2f8cff', icon: '#123a7a', text: '#9fd0ff', edge: '#0d3a80' },
+  Epic: { card: '#b52cf2', icon: '#4a1068', text: '#d77bff', edge: '#4a0d6a' },
+  Legendary: { card: '#f2c81a', icon: '#5a4a10', text: '#ffd21a', edge: '#7a5a00' },
+  Mythic: { card: '#7a2cf0', icon: '#2e0f62', text: '#c76bff', edge: '#2e0d6a' },
+  Cosmic: { card: 'linear-gradient(180deg, #ff5a68 0%, #ef2a3c 45%, #ff5a68 100%)', icon: '#5a1018', text: '#ff3a4e', edge: '#7a0a16' },
+  Secret: { card: '#f6f6fa', icon: '#c8102a', text: '#ffffff', edge: '#3a3d48' },
+  Celestial: { card: 'linear-gradient(180deg, #ff3a1a 0%, #ff8a12 30%, #ffd21a 60%, #ff8a12 80%, #ff3a1a 100%)', icon: '#5a2a08', text: '#ff7a1a', edge: '#7a2a00' },
+  Godly: { card: 'linear-gradient(180deg, #2a3cf0 0%, #6a2cf0 50%, #3a2ce0 100%)', icon: '#1a1260', text: '#b05cff', edge: '#16106a' },
+  Infernal: { card: 'linear-gradient(180deg, #ff2a1a 0%, #a00a0a 55%, #ff2a1a 100%)', icon: '#2a0606', text: '#ff5a2a', edge: '#4a0404' },
+}
+
+// Fuse Machine (game/fuse.js): step into its ring, put 4 hotbar cars in, and after
+// the fusion time you claim one new car. The result rarity is rolled from the
+// inputs' average rarity tier: `odds` = % for that tier, one up, two up (clamped
+// at Secret). The result earns `bonus` x its rarity's income. time = seconds by
+// the base (average) tier, Common .. Secret.
+export const FUSE = {
+  slots: 4,
+  odds: [61, 31, 8],
+  bonus: 1.5,
+  time: [60, 180, 420, 900, 1800, 2400],
+  saveKey: 'break-for-cars:fuse:v1',
+}
+// Daily Rewards (game/daily.js, the calendar button): one claim per day, a 7-day
+// streak that loops; missing a day for over `graceHours` restarts at Day 1.
+// kind 'cash' gives `amount`; kind 'car' puts a car of that rarity / roster name
+// in the hotbar, earning `bonus` x its rarity's income. Day 7 is the OP car.
+export const DAILY = {
+  saveKey: 'break-for-cars:daily:v1',
+  cooldownHours: 22,
+  graceHours: 48,
+  rewards: [
+    { kind: 'cash', amount: 10000 },
+    { kind: 'car', rarity: 'Epic', name: 'Nebula', look: 'whiteHyper' },
+    { kind: 'cash', amount: 75000 },
+    { kind: 'car', rarity: 'Legendary', name: 'Aurum', look: 'goldenCoupe' },
+    { kind: 'cash', amount: 750000 },
+    { kind: 'car', rarity: 'Mythic', name: 'Inferno', look: 'omega' },
+    { kind: 'car', rarity: 'Secret', name: 'Solar GT', look: 'orangeHyper', bonus: 3, op: true },
+  ],
+}
+// Car variants ("mutations"). A block bought during an event can carry the event's
+// variant; the car inside earns `mult` x a Normal one. Shown on the block (tint +
+// label), on the car's label and in the Index. weight = how often an event picks it.
+// tab = Index tab colour (CSS background).
+export const MUTATIONS = [
+  { id: 'Normal', mult: 1, color: '#ffffff', tab: '#e7eaf1' },
+  { id: 'Golden', mult: 2, color: '#ffd21a', tab: '#ffd21a', weight: 30 },
+  { id: 'Radioactive', mult: 3, color: '#b4ff26', tab: '#b4ff26', weight: 22 },
+  { id: 'Diamond', mult: 4, color: '#46eeff', tab: '#2ad8ff', weight: 16 },
+  { id: 'Ruby', mult: 5, color: '#ff3a4e', tab: '#ff4a5a', weight: 12 },
+  { id: 'Emerald', mult: 6, color: '#2ee86a', tab: '#3ae860', weight: 9 },
+  { id: 'Infernal', mult: 8, color: '#ff7a1a', tab: '#ff6a1a', weight: 7 },
+  { id: 'Rainbow', mult: 10, color: '#ff6af0', tab: 'linear-gradient(90deg, #ff3b4e, #ffd21a, #2dd84a, #2f9bff, #b23cff, #ff3fc8)', weight: 4 },
+]
+// Events (game/events.js): the "Next Event in" board counts down `every` s, then a
+// random variant (by weight) runs for `duration` s; meanwhile each new belt block
+// is that variant with `chance`.
+export const EVENTS = { every: 600, duration: 180, chance: 0.45 }
+// The Index window (game/carindex.js): every roster car in every variant.
+export const INDEX = { saveKey: 'break-for-cars:index:v1' }
+
+// Spin Wheel window (game/spin.js: the HUD wheel button or the plaza wheel's ring).
+// One free spin every `freeEvery` s (they stack). Six equal wedges clockwise from
+// the top; `weight` = % chance. Cash rewards pay `incomeSecs` of your current
+// garage income (at least `min`); 'block' puts that block in your hands (its price
+// in cash if your hands are full); 'spins' adds spins; 'car' adds a hotbar car.
+export const SPIN_WHEEL = {
+  saveKey: 'break-for-cars:spin:v1',
+  freeEvery: 1500,
+  startSpins: 1,
+  spinTime: 4.2,
+  rewards: [
+    { kind: 'cash', incomeSecs: 900, min: 25000, weight: 33.5, color: '#ffd21a' },
+    { kind: 'block', theme: 'hacker', weight: 4, color: '#3ddc4a' },
+    { kind: 'spins', amount: 2, weight: 15, color: '#a43cff' },
+    { kind: 'car', rarity: 'Secret', name: 'Phantom', look: 'bolido', bonus: 2, weight: 0.5, color: '#2f9bff' },
+    { kind: 'cash', incomeSecs: 240, min: 5000, weight: 45, color: '#ff9a1a' },
+    { kind: 'car', rarity: 'Mythic', name: 'Inferno', look: 'omega', bonus: 1.5, weight: 2, color: '#f0202a' },
+  ],
+}
+
+// Background music (game/music.js) at full volume; Bloxity's music_volume scales it.
+export const MUSIC_VOLUME = 0.16
+
+// Block rarity -> the cars that can come out of it, and their base $/s.
+export const RARITY_LADDER = ['Common', 'Uncommon', 'Epic', 'Legendary', 'Mythic', 'Secret']
+export const RARITY_INCOME = { Common: 3, Uncommon: 15, Epic: 120, Legendary: 600, Mythic: 3000, Secret: 20000 }
+export const CAR_ROSTER = {
+  Common: [{ name: 'Pebble', look: 'blueCoupe' }, { name: 'Dash', look: 'silverSport' }],
+  Uncommon: [{ name: 'Hornet', look: 'yellowSuper' }, { name: 'Zephyr', look: 'redSport' }],
+  Epic: [{ name: 'Glider', look: 'greenSuper' }, { name: 'Nebula', look: 'whiteHyper' }],
+  Legendary: [{ name: 'Blaze', look: 'orangeHyper' }, { name: 'Aurum', look: 'goldenCoupe' }],
+  Mythic: [{ name: 'Inferno', look: 'omega' }],
+  Secret: [{ name: 'Phantom', look: 'bolido' }],
+}
+
+export const SPAWN_FACING = -Math.PI / 2 // yaw the character faces on spawn (PI = toward -Z; -PI/2 = west, at the garage)
 
 // --- Player modes (modes.js) -------------------------------------------------
 // 'character' = third-person chase cam with the avatar on screen.
@@ -282,11 +474,49 @@ export const CAMERA = {
 // --- Bloxity (bloxity.js, avatar/) -------------------------------------------------
 // SDK setting keys this game listens for; registering a listener makes the control
 // appear in the portal's settings menu.
+// Volumes are 0..100. (fullscreen is applied by the portal itself, enable_chat never reaches games.)
 export const SETTINGS = {
+  master_volume: { def: '80', type: 'number', min: 0, max: 100 },
+  music_volume: { def: '80', type: 'number', min: 0, max: 100 },
   graphics_quality: { def: DEFAULT_GRAPHICS, type: 'enum', values: ['Low', 'Medium', 'High', 'Ultra'] },
   camera_sensitivity: { def: '1', type: 'number', min: 0.1, max: 5 },
   show_fps: { def: 'false', type: 'bool' },
-  fullscreen: { def: 'false', type: 'bool' },
+}
+
+// Bloxity's boards (trophy button + game page), declared on boot (bloxity.js). The game server
+// reports the scores under the player's verified id (backend platformBoards.ts, same list); the
+// north plaza's boards show their top rows (main.js).
+export const LEADERBOARDS = [
+  { id: 'cash', label: 'Most Cash', order: 'desc', mode: 'latest', format: 'compact', reset: 'none' },
+  { id: 'income', label: 'Total Income /s', order: 'desc', mode: 'best', format: 'compact', reset: 'none' },
+  { id: 'playtime', label: 'Play Time (min)', order: 'desc', mode: 'latest', format: 'number', reset: 'none' },
+]
+
+// Ad screens declared to Bloxity (ads.declareScreens). 'panel' = one of the game's windows is open
+// (shops, Index, Daily, Fuse, Spin); 'gameplay' banners stay off unless Boxity's admins turn them on.
+// The panel banners keep clear of the HUD's right column.
+export const AD_SCREENS = {
+  gameplay: {},
+  panel: {},
+}
+
+// --- Multiplayer (net.js, remotePlayers.js, remoteBases.js; backend ../Break-for-cars-backend) ---
+// Rooms of six (the backend's ROOM_MAX_CLIENTS), one garage per player. Deployed builds always reach
+// the server through the Bloxity matchmaker; SERVER_URL is for a local `npm start` in dev only.
+export const SERVER_URL = import.meta.env.DEV ? import.meta.env.VITE_SERVER_URL || '' : ''
+export const NET = {
+  room: 'world',
+  maxPlayers: 6,
+  poseHz: 10, // pose messages per second
+  baseEvery: 0.5, // s between garage updates while it changes
+  statsEvery: 15, // s between score reports (the server reports them to Bloxity's boards)
+  retry: 2, // s before the first reconnect attempt, doubling...
+  retryMax: 30, // ...up to this
+  avatarMax: 3000, // chars of avatar JSON the server accepts (backend AVATAR_MAX_LEN)
+  remoteLerp: 12, // 1/s: remote players ease toward their last relayed pose
+  remoteRange: 220, // m: further remote players are hidden
+  leaderboardEvery: 60, // s between refreshes of the plaza boards from Bloxity
+  adRewardSpins: 1, // spins a watched rewarded ad gives (spin.js), checked by the server
 }
 
 // The base rig, measured from player.glb: origin at the feet, 6.4 units tall at bind pose.
@@ -365,6 +595,7 @@ export const ANIM = {
     bobY: -0.2,
   },
   transitions: { toLocomotion: 0.14, toAirborne: 0.12, toLanding: 0.06 }, // s to blend a pose change
+  emoteFade: 0.2, // s a Bloxity emote takes to blend in and out
 }
 
 export const FONT_FAMILY = 'Fredoka'

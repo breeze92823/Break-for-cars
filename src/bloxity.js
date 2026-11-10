@@ -2,7 +2,7 @@
 // here may throw when the SDK is missing: a blocked sdk.bloxity.io leaves the
 // game fully playable on the default avatar and keyboard controls.
 // Docs: https://docs.bloxity.io/#html5
-import { GAME_SLUG, GAME_TITLE, SETTINGS, DEV_MODE, coerceSetting } from './config.js'
+import { AD_SCREENS, GAME_SLUG, GAME_TITLE, LEADERBOARDS, SETTINGS, DEV_MODE, coerceSetting } from './config.js'
 
 export function sdk() {
   if (DEV_MODE) return null
@@ -24,6 +24,10 @@ const proportionListeners = new Set()
 const authListeners = new Set()
 const settingListeners = new Set()
 const respawnListeners = new Set()
+const chatListeners = new Set()
+const emoteListeners = new Set()
+const adBreakListeners = new Set()
+const pointerLockListeners = new Set()
 const unsubscribers = []
 
 function emit(listeners, ...args) {
@@ -60,6 +64,30 @@ export function onSetting(fn) {
 export function onRespawnRequest(fn) {
   respawnListeners.add(fn)
   return () => respawnListeners.delete(fn)
+}
+
+// Every chat message in the room, the sender's own too: fn({ userId, text, seconds, isLocalPlayer }).
+// Subscribing is what opts the game in to Bloxity's chat; Bloxity draws the chat box itself.
+export function onChat(fn) {
+  chatListeners.add(fn)
+  return () => chatListeners.delete(fn)
+}
+// The emote this player picked on Bloxity's wheel: fn(id). Bloxity only tells the one who picked it
+// (net.js relays it to the others).
+export function onEmote(fn) {
+  emoteListeners.add(fn)
+  return () => emoteListeners.delete(fn)
+}
+// fn(true) as an ad break starts, fn(false) as it ends (pause + mute in between). Bloxity starts
+// them whenever it likes.
+export function onAdBreak(fn) {
+  adBreakListeners.add(fn)
+  return () => adBreakListeners.delete(fn)
+}
+// fn(locked) when the portal takes or gives back the mouse (its menu opened over the game).
+export function onPointerLock(fn) {
+  pointerLockListeners.add(fn)
+  return () => pointerLockListeners.delete(fn)
 }
 
 // --- Auth ---------------------------------------------------------------
@@ -142,8 +170,10 @@ export function init() {
   }
 
   try {
-    const onLocalhost = /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)
-    SDK.init(onLocalhost ? { gameSlug: GAME_SLUG, portalUrl: 'https://bloxity.io' } : { gameSlug: GAME_SLUG })
+    // The SDK learns its environment (prod / stage / local) from the platform; never guessed here.
+    SDK.init({ gameSlug: GAME_SLUG })
+    // Platform features, right after init: the emote button appears over the game.
+    SDK.game.registerFeature?.('emotes')
     SDK.game.loadingStep(`Loading ${GAME_TITLE}`)
 
     for (const key of Object.keys(SETTINGS)) {
@@ -178,10 +208,34 @@ export function init() {
     }
 
     unsubscribers.push(
-      SDK.player.onEvent((event) => {
+      SDK.player.onEvent((event, data) => {
         if (event === 'respawn_request') emit(respawnListeners)
+        else if (event === 'play_emote' && typeof data === 'string' && data) emit(emoteListeners, data)
+        else if (event === 'pointer_lock_changed') emit(pointerLockListeners, !!data)
       }),
     )
+
+    for (const [listen, on] of [
+      [SDK.ads?.onBreakStart, true],
+      [SDK.ads?.onBreakEnd, false],
+    ]) {
+      const off = listen?.call(SDK.ads, () => emit(adBreakListeners, on))
+      if (typeof off === 'function') unsubscribers.push(off)
+    }
+    SDK.ads?.declareScreens?.(AD_SCREENS)
+
+    const offChat = SDK.chat?.onMessage?.((m) => {
+      try {
+        if (!m || m.isGif) return // no GIFs over heads
+        emit(chatListeners, { userId: String(m.userId ?? ''), text: SDK.chat.bubbleText(m), seconds: SDK.chat.bubbleSeconds ?? 4, isLocalPlayer: !!m.isLocalPlayer })
+      } catch (err) {
+        console.warn('[bloxity] chat message failed', err)
+      }
+    })
+    if (typeof offChat === 'function') unsubscribers.push(offChat)
+
+    // Declaring the boards shows Boxity's trophy button; the game server reports the scores.
+    SDK.leaderboard?.define?.(LEADERBOARDS)
 
     SDK.game.loadingStep('Building the island')
   } catch (err) {
@@ -327,6 +381,86 @@ export async function locateRoom(id) {
 export function updateRoom(roomId) {
   try {
     sdk()?.game?.updateRoom?.(roomId)
+  } catch {
+    // Ignore.
+  }
+}
+
+// The player's Bloxity game token: the server proves who they are with it (backend auth.ts) instead
+// of trusting an id from the browser. '' without one.
+export function getToken() {
+  try {
+    const t = sdk()?.auth.getToken?.()
+    return typeof t === 'string' ? t : ''
+  } catch {
+    return ''
+  }
+}
+
+// Netcode joins: "X joined you" toasts for friends, and the friends already in the room.
+export function playerJoined(username) {
+  try {
+    sdk()?.game?.playerJoined?.(username)
+  } catch {
+    // Ignore.
+  }
+}
+export function playerInRoom(username) {
+  try {
+    sdk()?.game?.playerInRoom?.(username)
+  } catch {
+    // Ignore.
+  }
+}
+
+// --- Emotes, leaderboards, ads ---------------------------------------------------
+// Every emote in Bloxity's catalogue, [{ id, clip: { len, loop, tracks } }]. Rejects when it can't be read.
+export async function fetchEmotes() {
+  const base = sdk()?.environment?.()?.apiUrl
+  if (!base) return []
+  const res = await fetch(`${base.replace(/\/$/, '')}/v1/avatar/emotes`)
+  if (!res.ok) throw new Error(`emotes: ${res.status}`)
+  const body = await res.json()
+  return Array.isArray(body) ? body : body?.emotes ?? []
+}
+
+// A board's top rows from Bloxity ([{ name, value }]), or null without the SDK / on failure.
+export async function topScores(board, limit = 8) {
+  try {
+    const top = await sdk()?.leaderboard?.getTop?.(board, { period: 'all', limit })
+    if (!top?.rows) return null
+    return top.rows.map((r) => ({ name: r.displayName || r.username || 'Player', value: Number(r.score) || 0 }))
+  } catch {
+    return null
+  }
+}
+
+// Only offer a rewarded ad while Bloxity has one to show.
+export function canShowRewarded() {
+  try {
+    return sdk()?.ads?.isAvailable?.() === true
+  } catch {
+    return false
+  }
+}
+// Shows a rewarded ad; resolves { status, reason?, rewardToken?, test? } (never rejects). Pay out
+// only on status 'completed', and only once the game server has checked rewardToken (net.js).
+export async function showRewarded(placement) {
+  try {
+    return (await sdk()?.ads?.showRewarded?.(placement)) ?? { status: 'disabled' }
+  } catch (err) {
+    console.warn('[bloxity] rewarded ad failed', err)
+    return { status: 'error' }
+  }
+}
+
+// Screen ads: which of the declared screens (AD_SCREENS) is showing now. Bloxity draws the banners.
+let screenShown = ''
+export function showScreen(type) {
+  if (type === screenShown) return
+  screenShown = type
+  try {
+    sdk()?.ads?.screen?.(type)
   } catch {
     // Ignore.
   }

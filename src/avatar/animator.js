@@ -4,6 +4,7 @@
 // cycle at two depths, its phase advancing with distance travelled so the feet
 // stay planted at any speed. Writes only to bones and the avatar root's
 // rotation / position.y (the player group owns world placement).
+import { Euler, MathUtils, Quaternion } from 'three'
 import { ANIM } from '../config.js'
 import { PlayerRig, PoseBuffer } from './rig.js'
 
@@ -18,6 +19,22 @@ const kneeCurve = (phase) => {
 }
 
 const L = ANIM.locomotion
+
+const euler = new Euler()
+const delta = new Quaternion()
+const target = new Quaternion()
+
+// A Bloxity emote track's [[seconds, xDeg, yDeg, zDeg], ...] at time t into `euler`: smoothstep
+// between keys, held outside them (docs.bloxity.io, Emotes: "Playing it").
+function sampleTrack(keys, t) {
+  let i = 1
+  while (i < keys.length - 1 && keys[i][0] < t) i++
+  const a = keys[i - 1] ?? keys[0]
+  const b = keys[i] ?? a
+  const s = ease(clamp((t - a[0]) / (b[0] - a[0] || 1), 0, 1))
+  const at = (n) => MathUtils.degToRad(lerp(a[n], b[n], s) || 0)
+  euler.set(at(1), at(2), at(3), 'XYZ')
+}
 
 export function makeAnimator(root) {
   if (!root) return null
@@ -44,23 +61,66 @@ class PlayerAnimator {
     this.idleTime = 0
     this.airTime = 0
     this.bank = 0
+    this.overlay = null // optional (pose, dt) => void, set by game code
+    this.emote = null // { tracks: [{ bone, keys }], len, loop, time, weight, leaving }
+    this.binds = new Map() // bone -> bind quaternion, of every bone an emote has moved
+    for (const b of this.rig.bindings) this.binds.set(b.bone, b.rest)
+    this.posed = new Set(this.rig.bindings.map((b) => b.bone)) // bones the rig rewrites every frame
   }
 
   dispose() {
+    for (const [bone, bind] of this.binds) bone.quaternion.copy(bind)
     this.rig.resetToBindPose()
     this.root.rotation.set(0, 0, 0)
     this.root.position.y = 0
   }
 
-  // input: { grounded, speed, verticalVelocity, turn (-1..1) }
+  // input: { grounded, speed, verticalVelocity, turn (-1..1), busy (hands full or swinging) }
   update(dt, input) {
     if (!(dt > 0)) return
     this.stateTime += dt
     this.resolveState(dt, input)
     this.writePose(dt, input)
     this.blend(dt)
+    this.overlay?.(this.output, dt) // game poses (carrying, hammer swing) override bones last
     this.rig.applyPose(this.output)
+    this.applyEmote(dt, input)
     this.applyVisual(dt, input)
+  }
+
+  // clip: { len, loop, tracks: { bone: [[seconds, xDeg, yDeg, zDeg], ...] } }, from Bloxity's
+  // catalogue (standard rig bone names). Bones this rig lacks are skipped; never throws.
+  playEmote(clip) {
+    const len = Number(clip?.len)
+    if (!(len > 0) || !clip.tracks || typeof clip.tracks !== 'object') return
+    const tracks = []
+    for (const [name, keys] of Object.entries(clip.tracks)) {
+      const bone = this.root.nodes?.[name]
+      if (!bone || !Array.isArray(keys) || !keys.length || !keys.every(Array.isArray)) continue
+      if (!this.binds.has(bone)) this.binds.set(bone, bone.quaternion.clone())
+      tracks.push({ bone, keys })
+    }
+    if (tracks.length) this.emote = { tracks, len, loop: !!clip.loop, time: 0, weight: this.emote?.weight ?? 0, leaving: false }
+  }
+
+  // The clip goes on top of the pose, as degree deltas right-multiplied onto each bone's bind
+  // quaternion. Moving, jumping, a full pair of hands or a swing ends it, and so does a clip that
+  // doesn't loop running out.
+  applyEmote(dt, input) {
+    const e = this.emote
+    if (!e) return
+    e.time += dt
+    if (input.speed >= L.idleSpeed || !input.grounded || input.busy || (!e.loop && e.time >= e.len)) e.leaving = true
+    e.weight = clamp(e.weight + ((e.leaving ? -1 : 1) * dt) / ANIM.emoteFade, 0, 1)
+    const t = e.loop ? e.time % e.len : Math.min(e.time, e.len)
+    const k = ease(e.weight)
+    for (const { bone, keys } of e.tracks) {
+      const bind = this.binds.get(bone)
+      if (!this.posed.has(bone)) bone.quaternion.copy(bind)
+      sampleTrack(keys, t)
+      bone.quaternion.slerp(target.copy(bind).multiply(delta.setFromEuler(euler)), k)
+    }
+    if (e.leaving && e.weight === 0) this.emote = null
   }
 
   resolveState(dt, input) {

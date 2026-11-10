@@ -19,6 +19,7 @@ import { BLOCK_THEMES } from '../config.js'
 import { buildCar } from '../lobby/cars.js'
 import { canvasTex, paintBlockFace } from '../lobby/paint.js'
 import { boxAt, plastic } from '../lego.js'
+import { buildPickaxe, disposePickaxe } from '../game/pickaxe-model.js'
 
 // HUD icons are the game's own 3D models rendered once into small PNGs (a
 // throwaway renderer, disposed afterwards), so the hotbar cars and offer tiles
@@ -133,6 +134,75 @@ export function renderIcons(carKeys, blockThemes) {
     out.starter = shot(starterModel(), { dir: new Vector3(0.5, 0.45, 1), fill: 0.92 })
     for (const t of blockThemes) out[`block:${t}`] = shot(blockModel(t), { dir: new Vector3(1, 0.8, 1.2), fill: 0.92 })
     out.packs = shot(blockModel('divine', true), { dir: new Vector3(1, 0.8, 1.2), fill: 0.92 })
+  } finally {
+    renderer.dispose()
+    renderer.forceContextLoss()
+    renderer = scene = camera = null
+  }
+  return out
+}
+
+// Side-on car pictures for the Sell Cars / Fuse Machine windows; returns { look: dataURL }.
+export function renderSideCarIcons(looks) {
+  setup(200)
+  const out = {}
+  try {
+    for (const key of looks) {
+      const car = buildCar(key)
+      car.rotation.y = -0.5
+      out[key] = shot(car, { dir: new Vector3(0.35, 0.32, 1), fill: 0.6 })
+    }
+  } finally {
+    renderer.dispose()
+    renderer.forceContextLoss()
+    renderer = scene = camera = null
+  }
+  return out
+}
+
+// Block icons (BLOCK_THEMES keys) for the Spin Wheel; returns { key: dataURL }.
+export function renderBlockIcons(keys) {
+  setup(160)
+  const out = {}
+  try {
+    for (const k of keys) out[k] = shot(blockModel(k), { dir: new Vector3(1, 0.8, 1.2), fill: 0.92 })
+  } finally {
+    renderer.dispose()
+    renderer.forceContextLoss()
+    renderer = scene = camera = null
+  }
+  return out
+}
+
+// Shop / hotbar icons for every pickaxe (config PICKAXES); returns { id: dataURL }.
+export function renderPickaxeIcons(list) {
+  setup(160)
+  const out = {}
+  try {
+    for (const p of list) {
+      const m = buildPickaxe(p.look)
+      m.rotation.y = -0.25 // upright T, turned a touch to show depth
+      out[p.id] = shot(m, { dir: new Vector3(0.12, 0.18, 1), fill: 0.7 })
+      disposePickaxe(m)
+    }
+  } finally {
+    renderer.dispose()
+    renderer.forceContextLoss()
+    renderer = scene = camera = null
+  }
+  return out
+}
+
+// Hotbar icons for cars taken off their bays (CARS look keys); returns { look: dataURL }.
+export function renderCarIcons(looks) {
+  setup(160)
+  const out = {}
+  try {
+    for (const key of looks) {
+      const car = buildCar(key)
+      car.rotation.y = -0.35
+      out[key] = shot(car, { dir: new Vector3(0.9, 0.5, 1.4), fill: 0.92 })
+    }
   } finally {
     renderer.dispose()
     renderer.forceContextLoss()

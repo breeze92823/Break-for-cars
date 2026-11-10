@@ -149,3 +149,13 @@
   width: var(--side);
   height: var(--side);
 }
+
+/* Hammer swing (game/), top-left of the thumb arc. */
+.touch-btn.hit {
+  left: 0;
+  top: 0;
+  width: var(--side);
+  height: var(--side);
+  background: rgba(255, 150, 30, 0.55);
+  border-color: rgba(255, 220, 160, 0.9);
+}

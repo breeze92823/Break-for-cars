@@ -1,0 +1,261 @@
+// Colyseus link to ../Break-for-cars-backend (room "world", six players, one garage each).
+// Deployed builds reach it only through the Bloxity matchmaker (Legion.SDK.net.resolveEndpoint: a new
+// Client per resolve, retried with backoff, and resolved again when the room drops: that is how
+// players move off a pod being replaced). A page opened with ?roomId= (Open Rooms Join, a friend's
+// invite) joins that room first. In dev, VITE_SERVER_URL points at a local `npm start`.
+// What is relayed through the roster (backend presence.ts) so the others draw this player and their
+// garage: pose (~10/s), hands (pickaxe, block, held car), swings, emotes, the Bloxity look and the
+// garage itself. The server says which garage (`plot`) this player owns; main.js moves the game there.
+// The player is identified by their Bloxity game token (verified by the server), never by an id sent
+// from here. Scores go to the server, which reports them to Bloxity's boards under that verified id.
+// Never throws and never blocks play: without a server the game runs alone on the home garage.
+import { Client } from '@colyseus/sdk'
+import { DEV_MODE, LOBBY, NET, SERVER_URL } from './config.js'
+import {
+  authState, canResolveServer, displayName, getEquippedAvatar, getPfp, getProportions, getSkinTextureUrl, getToken, launchRoomId, locateRoom,
+  playerInRoom, playerJoined, resolveServerEndpoint, subscribeAuth, updateRoom,
+} from './bloxity.js'
+
+export const net = { room: null, connected: false }
+
+// --- Identity ---------------------------------------------------------------------
+function storedId(key, make) {
+  try {
+    let id = localStorage.getItem(key)
+    if (!id) localStorage.setItem(key, (id = make()))
+    return id
+  } catch {
+    return make()
+  }
+}
+// VITE_DEV_MODE (no SDK): a per-browser id a LOCAL server accepts, so two tabs tell themselves apart.
+const DEV_ID = DEV_MODE ? storedId('break-for-cars.dev', () => `dev-${Math.random().toString(36).slice(2, 8)}`) : ''
+const shownName = () => (DEV_ID && !authState.user ? `Dev ${DEV_ID.slice(4)}` : displayName() === 'Offline' ? 'Player' : displayName())
+const who = () => ({ token: getToken(), ...(DEV_ID && { devId: DEV_ID }), username: shownName(), pfp: getPfp() })
+
+export const hasServer = () => !!(SERVER_URL || canResolveServer())
+
+// --- Hooks into the game (main.js) ------------------------------------------------------
+const hooks = {
+  pose: () => null, // { x, y, z, yaw, speed }
+  loadout: () => null, // { tool, toolOut, carry, carryVariant, held }
+  base: () => null, // the garage snapshot (game.baseSnapshot)
+  stats: () => null, // { cash, income, playtime }
+  plot: () => LOBBY.homePlot, // the garage played on now (asked for again on every join)
+}
+
+function send(type, payload) {
+  try {
+    net.room?.send(type, payload)
+  } catch (err) {
+    console.warn('[net] send failed', type, err)
+  }
+}
+
+// --- Presence -----------------------------------------------------------------------
+// The Bloxity look as the server relays it: JSON { equipped, proportions, skin }, length-capped (the
+// skin URL is dropped first when it does not fit). '' = the default character.
+function avatarJson() {
+  if (!authState.user) return ''
+  const equipped = getEquippedAvatar()
+  if (!equipped) return ''
+  for (const skin of [getSkinTextureUrl(), null]) {
+    try {
+      const json = JSON.stringify({ equipped, proportions: getProportions(), skin })
+      if (json.length <= NET.avatarMax) return json
+    } catch {
+      return ''
+    }
+  }
+  return ''
+}
+const r2 = (n) => Math.round(n * 100) / 100
+function poseNow() {
+  const p = hooks.pose()
+  return p ? { x: r2(p.x), y: r2(p.y), z: r2(p.z), yaw: r2(p.yaw), speed: r2(p.speed) } : null
+}
+const sent = { pose: '', loadout: '', avatar: '', base: '', who: '' }
+const json = (v) => (v ? JSON.stringify(v) : '')
+function sendIfChanged(key, type, value, wrap = (v) => v) {
+  const j = json(value)
+  if (!j || j === sent[key]) return
+  sent[key] = j
+  send(type, wrap(value))
+}
+
+// A pickaxe swing (the others play it) and a Bloxity emote (Bloxity only tells the player who picked it).
+export const sendSwing = () => net.connected && send('swing', {})
+export const sendEmote = (id) => net.connected && send('emote', { id })
+
+// --- Roster -------------------------------------------------------------------------
+// The players in the room (sessionId -> PlayerState), or null when not connected.
+export const roster = () => (net.connected ? net.room?.state?.players ?? null : null)
+export const mySessionId = () => net.room?.sessionId ?? ''
+// The garage the server gave this player (-1 until it answers / offline).
+export function myPlot() {
+  const me = roster()?.get?.(mySessionId())
+  return me && me.plot >= 0 ? me.plot : -1
+}
+
+// "X joined you" toasts for Bloxity friends: the ones already here on joining, then each newcomer.
+let known = null // Set of sessionIds seen, null until the first roster after a join
+function announceJoins() {
+  const players = roster()
+  if (!players) return
+  const mine = mySessionId()
+  const ids = new Set()
+  players.forEach((p, id) => {
+    if (id === mine) return
+    ids.add(id)
+    if (known?.has(id) || !p.username) return
+    if (known) playerJoined(p.username)
+    else playerInRoom(p.username)
+  })
+  if (known || ids.size || players.size) known = ids
+}
+
+// --- Rewarded ads ----------------------------------------------------------------------
+// The server checks a rewarded ad's token with Bloxity: true only when it says so.
+let adWaiting = null
+export function verifyAdReward(rewardToken) {
+  return new Promise((resolve) => {
+    if (!net.connected || adWaiting) return resolve(false)
+    const timer = setTimeout(() => {
+      adWaiting = null
+      resolve(false)
+    }, 10000)
+    adWaiting = (msg) => {
+      clearTimeout(timer)
+      adWaiting = null
+      resolve(msg?.ok === true)
+    }
+    send('adReward', { rewardToken })
+  })
+}
+
+// --- Connection -------------------------------------------------------------------
+function attach(room, relay) {
+  net.room = room
+  net.connected = true
+  known = null
+  room.onMessage('adReward', (m) => adWaiting?.(m))
+  room.onLeave(() => {
+    if (net.room !== room) return
+    net.room = null
+    net.connected = false
+    known = null
+    updateRoom('')
+    // An unexpected close (a pod being replaced, a network drop): resolve again and rejoin.
+    setTimeout(connect, NET.retry * 1000)
+  })
+  // Friends' invites and the game page's Join land in this room.
+  updateRoom(relay ? `${relay}~${room.roomId}` : room.roomId)
+}
+
+let launchRoom = launchRoomId()
+async function joinLaunchRoom(options) {
+  const id = launchRoom
+  launchRoom = ''
+  if (!id) return null
+  try {
+    if (SERVER_URL) return { room: await new Client(SERVER_URL).joinById(id.split('~').pop(), options), relay: '' }
+    const at = await locateRoom(id)
+    if (at) return { room: await new Client(at.endpoint).joinById(at.roomId, options), relay: at.relayRoomId }
+  } catch (err) {
+    console.info('[net] the invited room is gone or full; matchmaking instead', err?.message ?? err)
+  }
+  return null
+}
+
+async function joinAnyRoom(options) {
+  if (SERVER_URL) return { room: await new Client(SERVER_URL).joinOrCreate(NET.room, options), relay: '' }
+  // Each endpoint is pinned to one pod: a new Client per resolve.
+  const id = authState.user && (authState.user._id || authState.user.id)
+  const { endpoint, relayRoomId } = await resolveServerEndpoint(id ? String(id) : undefined)
+  return { room: await new Client(endpoint).joinOrCreate(NET.room, options), relay: relayRoomId }
+}
+
+let connecting = false
+let retryIn = NET.retry
+async function connect() {
+  if (!hasServer() || connecting || net.connected) return
+  connecting = true
+  try {
+    const pose = poseNow()
+    const loadout = hooks.loadout()
+    const base = hooks.base()
+    const avatar = avatarJson()
+    const options = { ...who(), plot: hooks.plot(), pose, loadout, avatar, base }
+    sent.pose = json(pose)
+    sent.loadout = json(loadout)
+    sent.base = json(base)
+    sent.avatar = avatar
+    sent.who = json(who())
+    const { room, relay } = (await joinLaunchRoom(options)) ?? (await joinAnyRoom(options))
+    retryIn = NET.retry
+    attach(room, relay)
+  } catch (err) {
+    console.info(`[net] could not reach the server (retrying in ${retryIn}s); playing alone`, err?.message ?? err)
+    setTimeout(connect, retryIn * 1000)
+    retryIn = Math.min(retryIn * 2, NET.retryMax)
+  } finally {
+    connecting = false
+  }
+}
+
+// --- Loops --------------------------------------------------------------------------
+let baseAt = 0
+let statsAt = 0
+function tick() {
+  if (!net.connected) return
+  sendIfChanged('loadout', 'loadout', hooks.loadout())
+  const now = performance.now()
+  if (now - baseAt >= NET.baseEvery * 1000) {
+    baseAt = now
+    sendIfChanged('base', 'base', hooks.base())
+  }
+  if (now - statsAt >= NET.statsEvery * 1000) {
+    statsAt = now
+    const s = hooks.stats()
+    if (s) send('stats', s)
+  }
+}
+
+// pose(), loadout(), base(), stats(), plot(): see `hooks`.
+export function initNet(fns = {}) {
+  Object.assign(hooks, fns)
+  if (!hasServer()) return console.info('[net] no server configured; playing alone')
+  setInterval(() => net.connected && sendIfChanged('pose', 'pose', poseNow()), 1000 / NET.poseHz)
+  setInterval(tick, 100)
+  setInterval(() => {
+    announceJoins()
+    if (!net.connected) return
+    const a = avatarJson()
+    if (a !== sent.avatar) send('setAvatar', { avatar: (sent.avatar = a) })
+  }, 1000)
+  // Leaving the page frees the garage at once (a dropped connection instead keeps it for the server's
+  // reconnect window, while the SDK reconnects to the same session); back from the page cache: rejoin.
+  window.addEventListener('pagehide', () => {
+    const room = net.room
+    if (!room) return
+    net.room = null
+    net.connected = false
+    try {
+      room.leave(true)
+    } catch {
+      // Closing anyway.
+    }
+  })
+  window.addEventListener('pageshow', (e) => e.persisted && connect())
+  // Connect once auth has settled (the token says who is playing); a later sign-in / out re-identifies
+  // on the same connection, so the player stays in their friends' room.
+  subscribeAuth((s) => {
+    if (!s.ready) return
+    if (!net.connected) return void connect()
+    const w = who()
+    const j = json(w)
+    if (j === sent.who) return
+    sent.who = j
+    send('identify', w)
+  })
+}

@@ -49,6 +49,7 @@ export function createPlayerFx(playerGroup) {
 
   return {
     root,
+    tool, // game/ moves it into the hand while the hammer is equipped
     update(dt, elapsed) {
       swirls[0].rotation.z -= dt * 3.2
       swirls[1].rotation.z += dt * 4.5

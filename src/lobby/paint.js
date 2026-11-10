@@ -269,3 +269,127 @@ export function paintSwirl(size = 256) {
   }
   return c
 }
+
+// A stack of outlined text lines, each made of coloured parts; a part's fill is a
+// colour or an array of colours (a left-to-right gradient). Used for the block
+// labels ("Lucky Block / Common / $100") and the limited-car signs.
+// lines: [{ size, parts: [{ text, fill }] }]
+export function paintStack(lines, { outline = '#0d0f17', width = 512, pad = 14 } = {}) {
+  const c = makeCanvas(width, 16)
+  const g = c.getContext('2d')
+  const draw = () => {
+    const total = lines.reduce((h, l) => h + l.size * 1.12, 0) + pad * 2
+    c.height = Math.ceil(total)
+    g.clearRect(0, 0, c.width, c.height)
+    g.textBaseline = 'middle'
+    g.lineJoin = 'round'
+    let y = pad
+    for (const line of lines) {
+      g.font = `700 ${line.size}px ${FONT}`
+      const widths = line.parts.map((p) => g.measureText(p.text).width)
+      const full = widths.reduce((a, b) => a + b, 0)
+      let x = (c.width - full) / 2
+      const cy = y + (line.size * 1.12) / 2
+      line.parts.forEach((p, i) => {
+        g.textAlign = 'left'
+        g.lineWidth = Math.max(4, line.size * 0.22)
+        g.strokeStyle = outline
+        g.strokeText(p.text, x, cy)
+        if (Array.isArray(p.fill)) {
+          const grad = g.createLinearGradient(x, 0, x + widths[i], 0)
+          p.fill.forEach((col, k) => grad.addColorStop(k / (p.fill.length - 1), col))
+          g.fillStyle = grad
+        } else g.fillStyle = p.fill
+        g.fillText(p.text, x, cy)
+        x += widths[i]
+      })
+      y += line.size * 1.12
+    }
+  }
+  draw()
+  return { canvas: c, draw }
+}
+
+// The garage billboard: owner portrait on the left, "<name>'s / Car Garage / $x/s".
+// Draws into `c` (a canvas) so the texture can be repainted when the name changes.
+export function paintGarageScreen(c, name, income) {
+  const w = c.width
+  const h = c.height
+  const g = c.getContext('2d')
+  const grad = g.createLinearGradient(0, 0, 0, h)
+  grad.addColorStop(0, '#2b3350')
+  grad.addColorStop(1, '#1b2136')
+  g.fillStyle = grad
+  g.fillRect(0, 0, w, h)
+  // portrait: sky-blue tile with a blocky smiling head in a red cap
+  const px = 34
+  const py = 70
+  const ps = 180
+  g.fillStyle = '#4fa8e8'
+  roundRect(g, px, py, ps, ps, 18)
+  g.fill()
+  g.fillStyle = '#3d7fc4'
+  g.fillRect(px + 40, py + 150, 100, 30) // shoulders
+  g.fillStyle = '#f2c79a'
+  roundRect(g, px + 45, py + 40, 90, 100, 22)
+  g.fill()
+  g.fillStyle = '#c4161c'
+  roundRect(g, px + 38, py + 22, 104, 40, 14)
+  g.fill()
+  g.fillRect(px + 30, py + 52, 60, 12)
+  g.fillStyle = '#1b1c22'
+  g.fillRect(px + 70, py + 82, 9, 16)
+  g.fillRect(px + 102, py + 82, 9, 16)
+  g.lineWidth = 6
+  g.strokeStyle = '#1b1c22'
+  g.beginPath()
+  g.arc(px + 90, py + 108, 18, 0.15 * Math.PI, 0.85 * Math.PI)
+  g.stroke()
+  // text
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  g.lineJoin = 'round'
+  const tx = px + ps + (w - px - ps) / 2
+  const line = (text, y, size, fill) => {
+    let s = size
+    g.font = `700 ${s}px ${FONT}`
+    while (g.measureText(text).width > w - px - ps - 40 && s > 18) g.font = `700 ${(s -= 2)}px ${FONT}`
+    g.lineWidth = s * 0.2
+    g.strokeStyle = '#0d0f17'
+    g.strokeText(text, tx, y)
+    g.fillStyle = fill
+    g.fillText(text, tx, y)
+  }
+  // name null = nobody in the room owns this garage
+  if (name == null) {
+    line('Free', 110, 52, '#ffffff')
+    line('Car Garage', 180, 46, '#9fb0d8')
+    return c
+  }
+  line(`${name}'s`, 100, 46, '#ffffff')
+  line('Car Garage', 160, 46, '#ffffff')
+  line(`$${short(income)}/s`, 232, 58, '#6dff3a')
+  return c
+}
+
+// Steel-truss mullion: a light frame with X bracing, tiled along its length.
+export function paintTruss(w = 64, h = 128) {
+  const c = makeCanvas(w, h)
+  const g = c.getContext('2d')
+  g.fillStyle = '#a9b5dc'
+  g.fillRect(0, 0, w, h)
+  g.strokeStyle = '#dfe6f8'
+  g.lineWidth = 7
+  g.beginPath()
+  g.moveTo(6, 4)
+  g.lineTo(w - 6, h / 2)
+  g.lineTo(6, h - 4)
+  g.moveTo(w - 6, 4)
+  g.lineTo(6, h / 2)
+  g.lineTo(w - 6, h - 4)
+  g.stroke()
+  g.strokeStyle = '#6f7ba6'
+  g.lineWidth = 8
+  g.strokeRect(0, 0, w, h)
+  return c
+}

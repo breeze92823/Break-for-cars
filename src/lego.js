@@ -96,9 +96,6 @@ export function paint(color, { metalness = 0.35, roughness = 0.32 } = {}) {
   return new MeshPhysicalMaterial({ color, metalness, roughness, clearcoat: 1, clearcoatRoughness: 0.06 })
 }
 
-// One shared unit cube; boxes are scaled instances of it (bake merges them anyway).
-export const UNIT_BOX = new BoxGeometry(1, 1, 1)
-
 // Adds a box spanning [x0,x1] x [y0,y1] x [z0,z1] to parent.
 export function boxSpan(parent, mat, x0, y0, z0, x1, y1, z1, { shadow = true } = {}) {
   return boxAt(parent, mat, (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2, Math.abs(x1 - x0), Math.abs(y1 - y0), Math.abs(z1 - z0), { shadow })

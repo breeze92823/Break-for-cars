@@ -56,8 +56,16 @@ export function resetPlayer(spawn = SPAWN, facing = SPAWN_FACING) {
   body?.setNextKinematicTranslation({ x: spawn.x, y: spawn.y + HALF, z: spawn.z })
 }
 
+// Where respawn() (R, falling off the island, the portal's Reset Character) puts the player: the
+// apron of their own garage (main.js moves it with the garage the server assigns).
+const home = { spawn: { ...SPAWN }, facing: SPAWN_FACING }
+export function setHome(x, z, facing) {
+  home.spawn = { x, y: SPAWN.y, z }
+  home.facing = facing
+}
+
 export function respawn() {
-  resetPlayer()
+  resetPlayer(home.spawn, home.facing)
   syncYawToPlayer()
 }
 

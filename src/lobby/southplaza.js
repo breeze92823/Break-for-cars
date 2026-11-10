@@ -180,7 +180,8 @@ function stall(spec) {
 }
 
 // --- Next Event billboard --------------------------------------------------------------------
-function paintCountdown(seconds) {
+// title / color: the top line (default "Next Event in", white); seconds: the countdown.
+function paintCountdown(seconds, title = 'Next Event in', color = '#ffffff') {
   const c = paintCountdown.canvas ?? (paintCountdown.canvas = Object.assign(document.createElement('canvas'), { width: 640, height: 340 }))
   const g = c.getContext('2d')
   g.fillStyle = '#c8d1f0'
@@ -200,9 +201,12 @@ function paintCountdown(seconds) {
   g.font = `700 92px ${FONT}`
   g.lineWidth = 16
   g.strokeStyle = '#1d2236'
+  g.fillStyle = color
+  g.font = `700 ${title.length > 14 ? Math.round(92 * 14 / title.length) : 92}px ${FONT}`
+  g.strokeText(title, 320, 112)
+  g.fillText(title, 320, 112)
+  g.font = `700 92px ${FONT}`
   g.fillStyle = '#ffffff'
-  g.strokeText('Next Event in', 320, 112)
-  g.fillText('Next Event in', 320, 112)
   const t = `${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`
   g.strokeText(t, 320, 232)
   g.fillText(t, 320, 232)
@@ -224,14 +228,19 @@ function eventBoard(spec) {
   boxAt(g, brick('#6f7bab', { roughness: 0.6 }), 0, 12.6, -0.55, 12, 6.2, 0.1)
   place(g, spec)
   solidBox(1, 6, 0.8, spec.x, 6, spec.z)
-  let last = -1
+  let last = ''
+  let driven = null // { title, color, left } from the event system (game/events.js), else its own clock
   return {
     group: g,
+    set(info) {
+      driven = info
+    },
     update(elapsed) {
-      const left = Math.ceil(spec.every - (elapsed % spec.every))
-      if (left === last) return
-      last = left
-      paintCountdown(left)
+      const left = driven ? Math.max(0, Math.ceil(driven.left)) : Math.ceil(spec.every - (elapsed % spec.every))
+      const key = `${left}|${driven?.title ?? ''}`
+      if (key === last) return
+      last = key
+      paintCountdown(left, driven?.title, driven?.color)
       tex.needsUpdate = true
     },
   }
@@ -307,11 +316,11 @@ function fuseMachine(spec) {
 
   const toWorld = place(g, spec)
   solidBox(3.1, 2.2, 2.4, spec.x, 2.2, spec.z, spec.yaw)
-  const title = label('Fuse Machine', 0.95, { color: '#27c8ff', outline: '#0a1640' })
-  const count = label(`0/${spec.needs}`, 0.7, { color: '#ffffff', outline: '#0a1640' })
+  const title = label('Fuse Machine', 1.5, { color: '#27c8ff', outline: '#0a1640' })
+  const count = label(`0/${spec.needs}`, 1.0, { color: '#ffffff', outline: '#0a1640' })
   const [lx, lz] = toWorld(0, 0.5)
-  title.position.set(lx, 7.8, lz)
-  count.position.set(lx, 7.05, lz)
+  title.position.set(lx, 8.2, lz)
+  count.position.set(lx, 7.1, lz)
   const [rx, rz] = toWorld(1.0, 4.4)
   return { group: g, labels: [title, count], tipMat, zone: { id: 'fuse', label: 'Fuse Machine', x: rx, z: rz, r: 2, ring: r } }
 }
@@ -420,11 +429,11 @@ function spinWheel(spec) {
   const toWorld = place(g, spec)
   solidBox(1.8, 0.6, 1.3, spec.x, 0.6, spec.z, spec.yaw)
   solidPole(0.6, 7.5, spec.x, spec.z)
-  const title = label('Spin Wheel', 0.95, { color: '#c03cff', outline: '#22053d' })
-  const sub = label('Spin for rewards', 0.6, { color: '#ffffff', outline: '#22053d' })
+  const title = label('Spin Wheel', 1.5, { color: '#c03cff', outline: '#22053d' })
+  const sub = label('Spin for rewards', 0.9, { color: '#ffffff', outline: '#22053d' })
   const [lx, lz] = toWorld(0, 0)
-  title.position.set(lx, 8.7, lz)
-  sub.position.set(lx, 8.05, lz)
+  title.position.set(lx, 9.4, lz)
+  sub.position.set(lx, 8.4, lz)
   const [rx, rz] = toWorld(0, 3.4)
   return { group: g, labels: [title, sub], wheel, bulbA, bulbB, zone: { id: 'spin', label: 'Spin Wheel', x: rx, z: rz, r: 2, ring: r } }
 }
@@ -450,6 +459,10 @@ export function buildSouthPlaza(scene) {
   let spinVel = 0.25 // rad/s idle drift; jumps when the player steps into the ring
   return {
     zones,
+    // The "Next Event" board's text: { title, color, left } or null for its own countdown.
+    setEventBoard(info) {
+      board.set(info)
+    },
     spin() {
       if (spinVel < 2) spinVel = 9 + Math.random() * 4
     },

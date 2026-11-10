@@ -1,56 +1,11 @@
-import {
-  ExtrudeGeometry,
-  Group,
-  IcosahedronGeometry,
-  Mesh,
-  MeshLambertMaterial,
-  MeshPhysicalMaterial,
-  MeshStandardMaterial,
-  PlaneGeometry,
-  Shape,
-  ShapeGeometry,
-  Vector2,
-} from 'three'
-import { BEACH, WATER } from './config.js'
-import { RAPIER, addFixed } from './physics.js'
-import { mulberry32, paintCrackedSand, paintWaterNormal, toTexture } from './textures.js'
+import { Group, IcosahedronGeometry, Mesh, MeshLambertMaterial, MeshPhysicalMaterial, PlaneGeometry, Vector2 } from 'three'
+import { WATER } from './config.js'
+import { mulberry32, paintWaterNormal, toTexture } from './textures.js'
 
-// The ground: a pale cracked-sand slab in a bright cartoon sea, with puffy
-// clouds in the sky. Physically the land is one convex-hull collider plus an
-// invisible fence on every edge (landColliders).
-//
-// Texture techniques used here:
-//  - sand: tileable Voronoi cells + cracks -> colour + derived normal map,
-//    world-space UVs (ExtrudeGeometry caps use shape coordinates = metres)
-//  - sea: one ripple normal map used twice (normalMap + clearcoatNormalMap) at
-//    different scales, scrolled in different directions each frame, over a
-//    lighter shallow-water band hugging the shore
-
-// Outline of the land in world (x, z), counter-clockwise seen from above. Convex.
-export function beachOutline() {
-  const { front, back, halfWidth: W, wingZ, gateEdge } = BEACH
-  return [
-    [-W, back],
-    [W, back],
-    [W, wingZ],
-    [gateEdge, front],
-    [-gateEdge, front],
-    [-W, wingZ],
-  ]
-}
-
-// Shape space is (x, -z): rotating the extrusion -90 deg about X maps shape y to world -z and depth to +y.
-function outlineShape(points, scale = 1, cz = 0) {
-  const s = new Shape()
-  points.forEach(([x, z], i) => {
-    const sx = x * scale
-    const sz = cz + (z - cz) * scale
-    if (i === 0) s.moveTo(sx, -sz)
-    else s.lineTo(sx, -sz)
-  })
-  s.closePath()
-  return s
-}
+// The sea round the island and puffy clouds in the sky (the island itself is
+// lobby/ground.js). Sea technique: one ripple normal map used twice
+// (normalMap + clearcoatNormalMap) at different scales, scrolled in different
+// directions each frame.
 
 function makeClouds() {
   const rand = mulberry32(2024)
@@ -80,62 +35,6 @@ function makeClouds() {
     group.add(cloud)
   }
   return group
-}
-
-// The slab of land (visual): `top` is the material of its flat top, `side` the colour of its
-// rounded edge, `shallow` the lighter water band hugging it.
-export function buildSlab(root, top, side, shallow) {
-  const outline = beachOutline()
-  const bevel = 0.6
-  const slabGeo = new ExtrudeGeometry(outlineShape(outline), {
-    depth: BEACH.depth,
-    bevelEnabled: true,
-    bevelThickness: bevel,
-    bevelSize: 1.2,
-    bevelSegments: 3,
-    curveSegments: 1,
-  })
-  slabGeo.rotateX(-Math.PI / 2)
-  const slab = new Mesh(slabGeo, [top, new MeshStandardMaterial({ color: side, roughness: 1 })])
-  slab.position.y = -(BEACH.depth + bevel)
-  slab.receiveShadow = true
-
-  // Shallow water: a lighter band just around the land.
-  const cz = (BEACH.front + BEACH.back) / 2
-  const shallowGeo = new ShapeGeometry(outlineShape(outline, 1.12, cz))
-  shallowGeo.rotateX(-Math.PI / 2)
-  const band = new Mesh(shallowGeo, new MeshStandardMaterial({ color: shallow, roughness: 0.3, transparent: true, opacity: 0.55, depthWrite: false }))
-  band.position.y = WATER.level + 0.04
-  band.renderOrder = 1
-  root.add(slab, band)
-}
-
-// The land: the cracked-sand slab with a flat top, rounded edge and darker wet sides.
-export function buildGround(root) {
-  const sand = paintCrackedSand()
-  const sandColor = toTexture(sand.color, { repeat: 1 / BEACH.tile, srgb: true })
-  const sandNormal = toTexture(sand.normal, { repeat: 1 / BEACH.tile })
-  const top = new MeshStandardMaterial({ map: sandColor, normalMap: sandNormal, normalScale: new Vector2(0.6, 0.6), roughness: 1, metalness: 0 })
-  buildSlab(root, top, '#dcc08a', WATER.shallow)
-}
-
-// Collision for the land: the slab as a convex hull and a fence along every edge.
-export function landColliders() {
-  const outline = beachOutline()
-  const hull = []
-  for (const [x, z] of outline) hull.push(x, 0, z, x, -BEACH.depth, z)
-  addFixed(RAPIER.ColliderDesc.convexHull(new Float32Array(hull)), { x: 0, y: 0, z: 0 }, null, { friction: 0.9 })
-  for (let i = 0; i < outline.length; i++) {
-    const [ax, az] = outline[i]
-    const [bx, bz] = outline[(i + 1) % outline.length]
-    const len = Math.hypot(bx - ax, bz - az)
-    const yaw = Math.atan2(-(bz - az), bx - ax)
-    addFixed(
-      RAPIER.ColliderDesc.cuboid(len / 2 + 0.5, BEACH.fenceHeight / 2, 0.4),
-      { x: (ax + bx) / 2, y: BEACH.fenceHeight / 2, z: (az + bz) / 2 },
-      { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) },
-    )
-  }
 }
 
 // The sea around the land and the clouds in the sky.

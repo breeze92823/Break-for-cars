@@ -4,7 +4,7 @@ import { RAPIER, addFixed } from '../physics.js'
 import { boxSpan, brick } from '../lego.js'
 
 // The island: one studded grass slab, the two-lane road with its curbs, the
-// curbed plazas at both ends of the road and the six empty player plots. Colliders are
+// curbed plazas at both ends of the road and the six player plots. Colliders are
 // boxes (the grass slab, raised curbs and plot borders) plus an invisible
 // fence on the island edge.
 
@@ -122,20 +122,17 @@ export function buildGround(scene) {
   plaza(LOBBY.northPlaza, 'south')
   plaza(LOBBY.southPlaza, 'north')
 
-  // --- Player plots: empty grey slabs in a brown border ------------------------------
-  const plotMat = brick(C.plot, { roughness: 0.7 })
+  // --- Player plots: grass in a brown border (each holds a garage, lobby/base.js) ------
   const borderMat = brick(C.plotBorder, { roughness: 0.75 })
   const sx = LOBBY.plotW / 2
   const sz = LOBBY.plotD / 2
   const b = LOBBY.plotBorder
   for (const p of LOBBY.plots) {
-    boxSpan(root, plotMat, p.x - sx, -0.2, p.z - sz, p.x + sx, 0.1, p.z + sz, { shadow: false })
     // border: four strips, slightly raised
     boxSpan(root, borderMat, p.x - sx - b, -0.2, p.z - sz - b, p.x + sx + b, 0.24, p.z - sz, { shadow: false })
     boxSpan(root, borderMat, p.x - sx - b, -0.2, p.z + sz, p.x + sx + b, 0.24, p.z + sz + b, { shadow: false })
     boxSpan(root, borderMat, p.x - sx - b, -0.2, p.z - sz, p.x - sx, 0.24, p.z + sz, { shadow: false })
     boxSpan(root, borderMat, p.x + sx, -0.2, p.z - sz, p.x + sx + b, 0.24, p.z + sz, { shadow: false })
-    solid(p.x - sx - b, 0, p.z - sz - b, p.x + sx + b, 0.1, p.z + sz + b)
   }
 
   scene.add(root)

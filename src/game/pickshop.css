@@ -1,0 +1,249 @@
+/* "Buy Pickaxes" window (game/pickshop.js). Lives in the game layer (a `.hud`),
+   so it shares --s, the Fredoka font, .ol / .studs and .lego-btn. Sized from the
+   reference (1920x991): ~84 --s wide, cards ~19 --s tall, ~2.5 cards visible. */
+.pick-shop {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--safe-t) + 8px) calc(var(--safe-r) + 8px) calc(var(--safe-b) + 8px) calc(var(--safe-l) + 8px);
+  pointer-events: none;
+}
+.pick-shop.show {
+  display: flex;
+}
+.pick-win {
+  position: relative;
+  width: min(100%, max(320px, calc(var(--s) * 84)));
+  pointer-events: auto;
+  animation: pick-in 0.2s ease-out;
+}
+@keyframes pick-in {
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+}
+
+/* --- Title bar --------------------------------------------------------------------------- */
+.pick-head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--s) * 1.2);
+  height: max(48px, calc(var(--s) * 9.2));
+  padding: 0 calc(var(--s) * 0.8) 0 calc(var(--s) * 1.2);
+  border: calc(var(--s) * 0.45) solid #6a0a10;
+  border-radius: calc(var(--s) * 0.9);
+  background-color: #ff3a40;
+  box-shadow: inset 0 0 0 calc(var(--s) * 0.4) #ff8a8e, inset 0 calc(var(--s) * -1) 0 rgba(0, 0, 0, 0.15);
+}
+.pick-ico {
+  width: max(36px, calc(var(--s) * 7.4));
+  height: max(36px, calc(var(--s) * 7.4));
+  flex: none;
+}
+.pick-ico svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 calc(var(--s) * 0.3) 0 rgba(0, 0, 0, 0.35));
+}
+.pick-title {
+  flex: 1;
+  font-size: max(22px, calc(var(--s) * 4.8));
+  white-space: nowrap;
+}
+.pick-x {
+  width: max(44px, calc(var(--s) * 6.8));
+  height: max(44px, calc(var(--s) * 6.8));
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: calc(var(--s) * 0.9);
+  border: calc(var(--s) * 0.45) solid #6a0a10 !important;
+  background-color: #f0202a !important;
+  box-shadow: inset 0 0 0 calc(var(--s) * 0.45) #ffffff, inset 0 calc(var(--s) * -0.7) 0 rgba(0, 0, 0, 0.2);
+  font-size: max(24px, calc(var(--s) * 5.4));
+}
+
+/* --- Body + scrolling list ------------------------------------------------------------------ */
+.pick-body {
+  margin: calc(var(--s) * -0.6) calc(var(--s) * 1) 0;
+  padding: calc(var(--s) * 1.6) calc(var(--s) * 2) calc(var(--s) * 1.2);
+  border: calc(var(--s) * 0.45) solid #0d0f17;
+  border-top: 0;
+  border-radius: 0 0 calc(var(--s) * 1.4) calc(var(--s) * 1.4);
+  background: #2b3044;
+  box-shadow: 0 calc(var(--s) * 0.6) calc(var(--s) * 2) rgba(0, 0, 0, 0.35);
+}
+.pick-list {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--s) * 1.8);
+  max-height: min(calc(var(--s) * 50), calc(100dvh - var(--safe-t) - var(--safe-b) - max(48px, var(--s) * 9.2) - 48px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  padding: calc(var(--s) * 0.4) 0;
+}
+.pick-list::-webkit-scrollbar {
+  display: none;
+}
+/* The HUD turns touch gestures off everywhere; the list has to scroll. */
+.hud .pick-list,
+.hud .pick-list * {
+  touch-action: pan-y;
+}
+
+/* --- Card --------------------------------------------------------------------------------- */
+.pick-card {
+  --stud: calc(var(--s) * 2.6);
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--s) * 1.4);
+  min-height: max(84px, calc(var(--s) * 19));
+  padding: calc(var(--s) * 1.4);
+  border: calc(var(--s) * 0.45) solid var(--edge);
+  border-radius: calc(var(--s) * 1.3);
+  background-color: var(--card);
+  box-shadow: inset 0 0 0 calc(var(--s) * 0.45) rgba(255, 255, 255, 0.35), inset 0 calc(var(--s) * -1) 0 rgba(0, 0, 0, 0.15), 0 0 0 calc(var(--s) * 0.3) #0d0f17;
+}
+/* gradient rarities: the studs ride on top of the gradient */
+.pick-card[style*='gradient'] {
+  background-image:
+    radial-gradient(circle at 46% 44%, rgba(255, 255, 255, 0.3) 0 18%, transparent 21%),
+    radial-gradient(circle at 54% 56%, rgba(0, 0, 0, 0.14) 0 22%, transparent 25%),
+    var(--card);
+  background-size: var(--stud) var(--stud), var(--stud) var(--stud), 100% 100%;
+}
+.pick-icon {
+  --stud: calc(var(--s) * 2.2);
+  position: relative;
+  flex: none;
+  width: max(64px, calc(var(--s) * 16));
+  height: max(64px, calc(var(--s) * 16));
+  border: calc(var(--s) * 0.45) solid #0d0f17;
+  border-radius: calc(var(--s) * 1.2);
+  background-color: var(--icon);
+  box-shadow: inset 0 0 0 calc(var(--s) * 0.4) rgba(255, 255, 255, 0.12), inset 0 calc(var(--s) * 0.8) calc(var(--s) * 1.4) rgba(0, 0, 0, 0.3);
+}
+.pick-icon img {
+  position: absolute;
+  inset: 4%;
+  width: 92%;
+  height: 92%;
+  object-fit: contain;
+  filter: drop-shadow(0 calc(var(--s) * 0.3) 0 rgba(0, 0, 0, 0.4));
+}
+.pick-icon img:not([src]) {
+  visibility: hidden;
+}
+.pick-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  justify-content: space-between;
+  padding: calc(var(--s) * 0.2) 0;
+}
+.pick-name {
+  font-size: max(15px, calc(var(--s) * 3.9));
+  line-height: 1.05;
+}
+.pick-rarity {
+  margin-top: calc(var(--s) * 0.2);
+  font-size: max(12px, calc(var(--s) * 3));
+  color: var(--rtext);
+}
+.pick-dmg {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--s) * 0.8);
+  margin-top: calc(var(--s) * 0.8);
+  font-size: max(20px, calc(var(--s) * 5.2));
+}
+.pick-dmg svg {
+  width: max(24px, calc(var(--s) * 6));
+  height: max(24px, calc(var(--s) * 6));
+  flex: none;
+}
+.pick-btn {
+  flex: none;
+  width: max(88px, calc(var(--s) * 22));
+  height: max(44px, calc(var(--s) * 6.8));
+  font-size: max(18px, calc(var(--s) * 4.6));
+}
+.pick-btn[data-state='equipped'] {
+  --edge: #3a3d48;
+  background-color: #a7afc2 !important;
+  cursor: default;
+}
+.pick-btn[data-state='equipped'] span {
+  font-size: 0.78em;
+}
+
+/* --- Sell Cars window (game/sellshop.js): green title bar, car picture, value + Sell --------- */
+.sell-head {
+  border-color: #116b0c;
+  background-color: #49e43a;
+  box-shadow: inset 0 0 0 calc(var(--s) * 0.4) #a6ff8c, inset 0 calc(var(--s) * -1) 0 rgba(0, 0, 0, 0.15);
+}
+.sell-card {
+  min-height: max(72px, calc(var(--s) * 13.6));
+}
+.sell-card .pick-info {
+  justify-content: center;
+}
+.sell-car {
+  flex: none;
+  width: max(72px, calc(var(--s) * 13));
+  height: max(52px, calc(var(--s) * 9.4));
+  object-fit: contain;
+  filter: drop-shadow(0 calc(var(--s) * 0.4) 0 rgba(0, 0, 0, 0.35));
+}
+.sell-value {
+  flex: none;
+  font-size: max(18px, calc(var(--s) * 3.9));
+  color: #6dff3a;
+}
+.sell-btn {
+  width: max(76px, calc(var(--s) * 16.4));
+  height: max(44px, calc(var(--s) * 6.2));
+}
+
+/* Phone portrait: narrower cards. */
+@media (max-width: 520px) {
+  .pick-body {
+    padding: 10px 8px 8px;
+    margin: -3px 4px 0;
+  }
+  .pick-list {
+    gap: 9px;
+    max-height: min(58dvh, 480px);
+  }
+  .pick-card {
+    gap: 8px;
+    padding: 7px;
+  }
+  .pick-name {
+    font-size: 14px;
+  }
+  .pick-btn {
+    width: 84px;
+    font-size: 17px;
+  }
+  .sell-car {
+    width: 60px;
+  }
+  .sell-value {
+    font-size: 15px;
+  }
+  .sell-btn {
+    width: 64px;
+  }
+}

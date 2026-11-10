@@ -142,7 +142,7 @@ function installLook(zone) {
   zone.addEventListener('pointercancel', lift)
 }
 
-// actions: { mode, day, respawn } callbacks (the menu is Boxity's toolbar).
+// actions: { mode, day, respawn, hit? } callbacks (the menu is Boxity's toolbar).
 export function installTouch(actions) {
   const root = el('div', 'touch-root')
   const left = el('div', 'touch-zone touch-left')
@@ -169,6 +169,7 @@ export function installTouch(actions) {
       inputState.jump = true
     }),
   )
+  if (actions.hit) cluster.append(button('hit', 'HIT', actions.hit))
 
   root.append(left, right, top, cluster)
   document.body.appendChild(root)

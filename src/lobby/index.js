@@ -4,6 +4,7 @@ import { buildGround } from './ground.js'
 import { buildNature } from './nature.js'
 import { buildLeaderboards } from './leaderboards.js'
 import { buildSouthPlaza } from './southplaza.js'
+import { buildBase } from './base.js'
 import { createBursts, sparkleField, updateFields } from './fx.js'
 
 // The whole lobby: island + road + plazas + plots (ground.js), scenery
@@ -22,14 +23,29 @@ export function buildLobby(scene, preset) {
   scene.add(pollen)
   const bursts = createBursts()
   scene.add(bursts.points)
+  // A garage on every plot: the local player's game takes one (main.js moves it when the server
+  // hands out another), the others show the other players' garages or stand free.
+  const bases = LOBBY.plots.map((plot, i) => {
+    const b = buildBase(scene, plot, bursts)
+    b.index = i
+    b.setLit(false)
+    return b
+  })
+  const base = bases[LOBBY.homePlot]
+  const spots = { ...LOBBY.spots, plot: base.spot }
 
   let night = 0
   let activeZone = null
   let lastZone = null
   return {
     zones: plaza.zones,
-    spots: LOBBY.spots,
+    // The north plaza's boards: { kind ('cash' | 'playtime' | 'income'), setEntries([{ name, value }]) }.
+    boards: boards.boards.map((b, i) => ({ kind: LOBBY.leaderboards[i].kind, setEntries: b.setEntries })),
+    setEventBoard: (info) => plaza.setEventBoard(info),
+    spots,
     bursts,
+    base, // the home garage (LOBBY.homePlot)
+    bases,
     get activeZone() {
       return activeZone
     },
@@ -41,6 +57,10 @@ export function buildLobby(scene, preset) {
       night += (nightTarget - night) * Math.min(1, dt * 1.5)
       boards.setNight(night)
       plaza.setNight(night)
+      for (const b of bases) {
+        b.setNight(night)
+        b.update(dt, elapsed)
+      }
       activeZone = null
       for (const z of plaza.zones) if (Math.hypot(playerPos.x - z.x, playerPos.z - z.z) < z.r && playerPos.y < 2) activeZone = z
       if (activeZone !== lastZone) {

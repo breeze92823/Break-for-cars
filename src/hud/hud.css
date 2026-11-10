@@ -173,6 +173,20 @@
   width: 52%;
   height: 52%;
 }
+.round-btn {
+  position: relative;
+}
+.round-btn .badge.alert {
+  top: -14%;
+  right: -14%;
+  border-radius: calc(var(--s) * 0.6);
+  background: #ff1f2a;
+  border: calc(var(--s) * 0.3) solid #fff;
+  animation: money-bump 0.9s ease-in-out infinite;
+}
+.badge[hidden] {
+  display: none;
+}
 
 /* --- Left column: Shop / Index / Collect All / FREE! / Auto Swing ---------------------- */
 .hud-left {
@@ -384,6 +398,15 @@
   filter: drop-shadow(0 calc(var(--s) * 0.35) 0 rgba(0, 0, 0, 0.35));
 }
 
+.hud-money.bump {
+  animation: money-bump 0.28s ease-out;
+}
+@keyframes money-bump {
+  40% {
+    transform: scale(1.08);
+  }
+}
+
 /* --- Hotbar ------------------------------------------------------------------------------ */
 .hud-hotbar {
   position: absolute;
@@ -391,7 +414,21 @@
   bottom: calc(var(--safe-b) + var(--s) * 0.6);
   transform: translateX(-50%);
   display: flex;
+  flex-wrap: wrap-reverse; /* many cars on a narrow phone: the extra row goes above */
+  justify-content: center;
+  row-gap: calc(var(--s) * 3);
   gap: calc(var(--s) * 0.75);
+  width: max-content;
+  max-width: calc(100vw - var(--safe-l) - var(--safe-r) - 16px);
+}
+/* Cars taken off their bays: rarity bar along the bottom, $/s above, level below. */
+.slot.car {
+  box-shadow: inset 0 calc(var(--s) * -0.55) 0 var(--rarity, #fff);
+}
+.slot.car .tag {
+  bottom: 6%;
+  font-size: max(9px, calc(var(--s) * 1.5));
+  color: #fff;
 }
 .slot {
   position: relative;
@@ -427,6 +464,18 @@
   font-size: max(11px, calc(var(--s) * 2.05));
   color: #c6ff3a;
 }
+.slot[hidden] {
+  display: none;
+}
+.slot.carry .tag {
+  color: #fff;
+  font-size: max(9px, calc(var(--s) * 1.5));
+  bottom: auto;
+  top: calc(var(--s) * -2.4);
+  white-space: nowrap;
+  left: -40%;
+  right: -40%;
+}
 .slot .tag {
   position: absolute;
   left: 0;
@@ -456,6 +505,28 @@
   transform: translate(-50%, 0);
 }
 
+/* --- Announcement banner ---------------------------------------------------------------- */
+.hud-banner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--safe-t) + max(56px, var(--s) * 11.5));
+  display: flex;
+  justify-content: center;
+  padding: calc(var(--s) * 0.6) 0;
+  background: linear-gradient(90deg, transparent, rgba(30, 34, 52, 0.55) 25%, rgba(30, 34, 52, 0.55) 75%, transparent);
+  font-size: max(18px, calc(var(--s) * 4.3));
+  color: #ff3b5c;
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity 0.25s, transform 0.25s;
+  white-space: nowrap;
+}
+.hud-banner.show {
+  opacity: 1;
+  transform: scale(1);
+}
+
 /* --- Small screens ------------------------------------------------------------------------- */
 /* Phone landscape: the touch thumb cluster owns the bottom-right, so the offers
    shrink and ride higher; the left column tightens. */
@@ -464,29 +535,52 @@
     --s: 3.6px;
   }
   .hud-right {
-    top: calc(var(--safe-t) + 64px);
-    grid-template-columns: repeat(2, 48px);
-    gap: 4px 10px;
+    top: calc(var(--safe-t) + 60px);
+    grid-template-columns: repeat(2, 52px);
+    gap: 2px 12px;
   }
   .offer {
-    height: 54px;
+    height: 50px;
   }
   .offer .name {
-    font-size: 9px;
+    font-size: 8px;
+    -webkit-text-stroke-width: 2px;
   }
   .price {
     font-size: 11px;
   }
+  /* left column: three across, Auto Swing becomes a square tile */
   .hud-left {
-    grid-template-columns: repeat(2, 44px);
+    grid-template-columns: repeat(3, 44px);
     gap: 6px;
   }
   .wide-btn {
-    font-size: 13px;
+    grid-column: span 1;
+    height: 44px;
+    flex-direction: column;
+    gap: 0;
+    font-size: 8px;
+    white-space: normal;
+    line-height: 0.95;
+    text-align: center;
+  }
+  .wide-btn svg {
+    width: 24px;
+    height: 24px;
   }
   .hud-money {
     font-size: 22px;
   }
+  /* the calendar takes the empty third cell of the left grid's second row */
+  .hud .hud-topright {
+    top: calc(max(31.5vh, var(--reserved-left) + 10px) + 50px);
+    left: calc(var(--safe-l) + var(--s) * 3.4 + 100px);
+    right: auto;
+  }
+}
+/* Touch: the touch layer's own buttons sit in the top-right corner. */
+.touch-ui .hud-topright {
+  right: calc(var(--safe-r) + 132px);
 }
 /* Phone portrait: the top row is the full width, the spin wheel drops under it. */
 @media (max-width: 520px) {
@@ -521,5 +615,24 @@
     bottom: calc(var(--safe-b) + 60px);
     left: calc(var(--safe-l) + 12px);
     right: auto;
+  }
+}
+/* Phone portrait with touch controls: the joystick and the jump/run cluster own
+   the bottom ~210px, so the hotbar, money, calendar and offers stack above them. */
+@media (max-width: 520px) {
+  .touch-ui .hud-hotbar {
+    bottom: calc(var(--safe-b) + 214px);
+  }
+  .touch-ui .hud-money {
+    bottom: calc(var(--safe-b) + 290px);
+    left: calc(var(--safe-l) + 12px);
+  }
+  .touch-ui .hud .hud-topright {
+    bottom: calc(var(--safe-b) + 286px);
+    left: auto;
+    right: calc(var(--safe-r) + 14px);
+  }
+  .touch-ui .hud-right {
+    bottom: calc(var(--safe-b) + 350px);
   }
 }
