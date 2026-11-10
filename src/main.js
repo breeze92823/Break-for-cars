@@ -3,6 +3,7 @@ import { CAMERA, COARSE_POINTER, graphicsPreset, RENDER } from './config.js'
 import * as bloxity from './bloxity.js'
 import { install as installInput, isLocked, onKey } from './input.js'
 import { installTouch } from './touch.js'
+import { installWakeLock } from './wakelock.js'
 import { createPlayerBody, interpolate as interpolatePlayer, player, resetPlayer, respawn, setHome } from './player.js'
 import { setCameraSensitivity, setView, syncYawToPlayer, update as updateCamera } from './camera.js'
 import { onModeChanged, toggleMode } from './modes.js'
@@ -320,6 +321,7 @@ onKey('KeyV', () => (sfx.click(), toggleMode()))
 onKey('KeyN', () => (sfx.click(), lighting.toggleDayNight()))
 onKey('KeyR', respawn)
 // Escape opens Bloxity's own menu (input.js); P is Bloxity's pause key on CrazyGames: never bound here.
+installWakeLock()
 installTouch({ mode: toggleMode, day: () => lighting.toggleDayNight(), respawn, hit: () => game?.swing() })
 
 // --- Loop -------------------------------------------------------------------

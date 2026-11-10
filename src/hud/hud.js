@@ -198,7 +198,7 @@ export function createHud({ onShop, onPlot, onSpin, onCollectAll, onAutoSwing, o
   // drops under that row instead of onto it.
   function obstacles(stacked) {
     const list = [...reserved]
-    for (const e of [document.querySelector('.touch-ui .touch-top'), stacked && left]) {
+    for (const e of [document.querySelector('.touch-ui .touch-top'), stacked ? left : null]) {
       const r = e?.getBoundingClientRect()
       if (r?.width) list.push({ left: r.left, top: r.top, width: r.width, height: r.height })
     }
