@@ -36,7 +36,8 @@ import { BASE, BLOCK_THEMES, CAR_ROSTER, CONVEYOR_SKINS, CONVEYOR_UPGRADE, GAME,
 import { brick } from '../lego.js'
 import { buildCar } from '../lobby/cars.js'
 import { paintStack, short } from '../lobby/paint.js'
-import { sparkleField } from '../lobby/fx.js'
+import { disposeFx, sparkleField } from '../lobby/fx.js'
+import { rarityAura } from '../lobby/rarityfx.js'
 import { fontReady } from '../propkit.js'
 import { player } from '../player.js'
 import * as sfx from './audio.js'
@@ -46,6 +47,7 @@ import { createSellShop } from './sellshop.js'
 import { createFuse } from './fuse.js'
 import { createDaily } from './daily.js'
 import { createFreeCar } from './freecar.js'
+import { createNews } from './news.js'
 import { createEvents } from './events.js'
 import { createIndex } from './carindex.js'
 import { createSpin } from './spin.js'
@@ -103,7 +105,8 @@ function spriteOf(canvas, height) {
 // onSwing(): a swing started (relayed so the others see it).
 // rewardedAd: { available(), watch() } for the Spin Wheel's "Watch Ad" button (spin.js).
 // onTutorialStep(step): the new-player tutorial moved on (net.js saves it for the account).
-export function createGame({ scene, camera, canvas, base, bursts, hud, playerGroup, playerFx, getAvatar, getAnimator, lobby, onSwing, rewardedAd, nearbyPlayer, onTutorialStep, claimFreeCar }) {
+// onNewsSeen(version): the "New Update!" window was closed (net.js saves it for the account).
+export function createGame({ scene, camera, canvas, base, bursts, hud, playerGroup, playerFx, getAvatar, getAnimator, lobby, onSwing, rewardedAd, nearbyPlayer, onTutorialStep, claimFreeCar, onNewsSeen }) {
   let g = base.group
   g.updateMatrixWorld(true)
   base.setLit(true)
@@ -331,8 +334,7 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
     const car = buildCar(s.look)
     car.scale.setScalar(GAME.carScale)
     spin.add(car)
-    const tier = tierOf(s.rarity)
-    if (tier >= 2) holder.add(sparkleField({ count: 10 + tier * 4, center: { x: 0, y: 0, z: 0 }, box: { x: 6.5, y: 2.4, z: 3.2 }, rise: 0.5, life: 2.2, size: 0.2, color: RARITY_COLORS[s.rarity], seed: 300 + i }))
+    holder.add(rarityAura(s.rarity, 300 + i))
     g.add(holder)
 
     // label over the car
@@ -431,6 +433,7 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
       })
     }
     drop(view.holder)
+    disposeFx(view.holder)
     if (view.kind === 'car') {
       drop(view.label)
       drop(view.signHolder)
@@ -1097,7 +1100,9 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
   })
   // One window at a time: opening one closes the rest (pickShop is added below).
   const settings = createSettings(layer, { sfx, hud })
-  const windows = [sellShop, fuseMachine, daily, freeCar, carIndex, settings]
+  // The "New Update!" window: opens by itself once per update (seen version kept for the account).
+  const news = createNews(layer, { sfx, onShow: () => solo(news), onSeen: (v) => onNewsSeen?.(v) })
+  const windows = [sellShop, fuseMachine, daily, freeCar, carIndex, settings, news]
   const events = createEvents(layer, { lobby, base, hud, sfx })
   const spinWheel = createSpin(layer, {
     inv,
@@ -1622,6 +1627,13 @@ export function createGame({ scene, camera, canvas, base, bursts, hud, playerGro
     // The free car's play time: what this browser counted (net.js freeCarSync) / the server's answer.
     freeCarSnapshot: () => freeCar.snapshot(),
     syncFreeCar: (msg) => freeCar.sync(msg),
+    // The "New Update!" window: the version this browser has seen (net.js newsSync), the server's
+    // answer, and the fallback when no answer comes (a guest offline / no server).
+    get newsSeen() {
+      return news.seen
+    },
+    syncNews: (msg) => news.sync(msg),
+    decideNews: () => news.decide(),
     toggleSettings: () => (solo(settings), settings.toggle()),
     toggleIndex: () => (solo(carIndex), carIndex.toggle()),
     toggleSpin: () => (solo(spinWheel), spinWheel.toggle()),

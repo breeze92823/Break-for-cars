@@ -11,7 +11,8 @@ import { brick } from './lego.js'
 import { fontReady } from './propkit.js'
 import { buildCar } from './lobby/cars.js'
 import { paintStack, short } from './lobby/paint.js'
-import { sparkleField } from './lobby/fx.js'
+import { disposeFx, sparkleField } from './lobby/fx.js'
+import { rarityAura } from './lobby/rarityfx.js'
 import { makeCanvas, paintHpLabel } from './game/paint.js'
 
 const MUT = Object.fromEntries(MUTATIONS.filter((m) => m.mult > 1).map((m) => [m.id, m]))
@@ -82,6 +83,7 @@ function createView(base, bursts) {
     const v = bays[i]
     if (!v) return
     g.remove(v.holder)
+    disposeFx(v.holder)
     if (v.label) {
       g.remove(v.label)
       dropSprite(v.label)
@@ -128,8 +130,7 @@ function createView(base, bursts) {
     }
     car.scale.setScalar(GAME.carScale)
     spin.add(car)
-    const tier = tierOf(s.r)
-    if (tier >= 2) holder.add(sparkleField({ count: 8 + tier * 3, center: { x: 0, y: 0, z: 0 }, box: { x: 6.5, y: 2.4, z: 3.2 }, rise: 0.5, life: 2.2, size: 0.2, color: RARITY_COLORS[s.r], seed: 300 + i }))
+    holder.add(rarityAura(s.r, 300 + i))
     g.add(holder)
     const stack = paintStack(carLines(s, mult), { width: 640 })
     const label = spriteOf(stack.canvas, 2.4)

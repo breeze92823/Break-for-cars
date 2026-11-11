@@ -27,7 +27,7 @@ import { setMusic, setMusicVolume } from './game/music.js'
 import { gameSettings, onGameSettings } from './game/settings.js'
 import { playEmote } from './avatar/emotes.js'
 import { createBubble } from './bubble.js'
-import { claimFreeCar, initNet, myPlot, net, sendEmote, sendSwing, sendTutorial, verifyAdReward } from './net.js'
+import { claimFreeCar, hasServer, initNet, myPlot, net, sendEmote, sendNewsSeen, sendSwing, sendTutorial, verifyAdReward } from './net.js'
 import { createRemotePlayers } from './remotePlayers.js'
 import { createRemoteBases } from './remoteBases.js'
 import { LEADERBOARDS, NET } from './config.js'
@@ -227,6 +227,7 @@ for (const b of lobby.bases) b.onAnnounce((msg) => b === game?.base && hud.annou
     onSwing: sendSwing,
     onTutorialStep: sendTutorial, // saved for the account (backend tutorial.ts)
     claimFreeCar: () => (net.connected ? claimFreeCar() : Promise.resolve(null)), // checked by the server (backend freeCar.ts)
+    onNewsSeen: sendNewsSeen, // saved for the account (backend news.ts)
     nearbyPlayer: () => remotePlayers?.nearest(player.position, 4.5),
     rewardedAd: {
       available: () => net.connected && bloxity.canShowRewarded(),
@@ -255,7 +256,12 @@ initNet({
   onTutorial: (step) => game.syncTutorial(step),
   freeCar: () => game.freeCarSnapshot(),
   onFreeCar: (msg) => game.syncFreeCar(msg),
+  news: () => game.newsSeen,
+  onNews: (msg) => game.syncNews(msg),
 })
+// The "New Update!" window waits for the server's word on a signed-in account (it may have seen it on
+// another device); with no server, or no answer in time, this browser's own record decides.
+setTimeout(() => game.decideNews(), hasServer() ? 8000 : 2500)
 // The server hands out the garages: move the game (and us, when we were home) to ours.
 function followPlot(plot) {
   const next = lobby.bases[plot]

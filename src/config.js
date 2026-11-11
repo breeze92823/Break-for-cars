@@ -128,7 +128,11 @@ export const BASE = {
 }
 
 // Car looks used by the shop, the podium, the hotbar and the parked car.
-// style: 'super' (wedge), 'hyper' (low, big wing), 'sport' (GT coupe), 'coupe' (hybrid)
+// style: 'super' (wedge), 'hyper' (low, big wing), 'sport' (GT coupe), 'coupe' (hybrid),
+// 'hatch' (city car), 'sedan' (4-door), 'muscle' (long bonnet), 'luxury' (Rolls-Royce-inspired),
+// 'limo' (Maybach-inspired), 'roadster' (Tesla Roadster-inspired EV), 'cyber' (faceted wedge),
+// 'canopy' (concept, glass canopy). Optional: roof (two-tone, luxury/limo), stripe (racing
+// stripes), trim (neon sill line), neon (neon kit + under-glow), finish 'chrome' | 'satin' | 'pearl'.
 export const CARS = {
   yellowSuper: { body: '#ffcc0f', accent: '#1b1b1f', style: 'super', rim: '#2a2a2e' },
   whiteHyper: { body: '#f4f6fb', accent: '#1d2330', style: 'hyper', rim: '#c9ced8' },
@@ -140,6 +144,68 @@ export const CARS = {
   omega: { body: '#ff3d0a', accent: '#0f0f12', style: 'hyper', rim: '#18181c', neon: '#ff7a2a' },
   greenSuper: { body: '#7ee81c', accent: '#16181c', style: 'super', rim: '#25262b' },
   bolido: { body: '#11151d', accent: '#0a0d12', style: 'hyper', rim: '#151a22', neon: '#18e8ff' },
+
+  // Common: everyday cars
+  mintHatch: { body: '#8fe3c8', accent: '#1e2a2a', style: 'hatch', rim: '#d8dde4' },
+  orangeHatch: { body: '#ff8a2a', accent: '#1d1f24', style: 'hatch', rim: '#2a2c31' },
+  taxiSedan: { body: '#ffd21a', accent: '#1b1b1f', style: 'sedan', rim: '#c9ced8', stripe: '#1b1b1f' },
+  whiteSedan: { body: '#eef1f6', accent: '#2a2f38', style: 'sedan', rim: '#b9bfcc' },
+  skySedan: { body: '#7fc4ff', accent: '#1c2533', style: 'sedan', rim: '#d0d5de' },
+  limeHatch: { body: '#a8e83a', accent: '#1b1f16', style: 'hatch', rim: '#2a2d26' },
+  lilacCoupe: { body: '#b9a4e8', accent: '#231d33', style: 'coupe', rim: '#d6d8e0' },
+  rustHatch: { body: '#a8552a', accent: '#24170f', style: 'hatch', rim: '#8a8f99', finish: 'satin' },
+
+  // Uncommon: sporty and muscle
+  stallionMuscle: { body: '#d8141b', accent: '#141418', style: 'muscle', rim: '#d9dde6', stripe: '#ffffff' },
+  thunderMuscle: { body: '#1d3a8a', accent: '#0f1424', style: 'muscle', rim: '#2a2e38', stripe: '#ffffff' },
+  banditMuscle: { body: '#111216', accent: '#0a0a0c', style: 'muscle', rim: '#d8b04a', stripe: '#d8b04a', caliper: '#d8b04a' },
+  tealSport: { body: '#14b8b0', accent: '#0f1c22', style: 'sport', rim: '#1f2328' },
+  execSedan: { body: '#3a3f4a', accent: '#15181d', style: 'sedan', rim: '#e3e6ec', finish: 'pearl' },
+  cometCoupe: { body: '#ff6a12', accent: '#191a1f', style: 'coupe', rim: '#1f2025', stripe: '#141418' },
+  voltHatch: { body: '#1f6bff', accent: '#0f1626', style: 'hatch', rim: '#e3e6ec', trim: '#4ae0ff' },
+  rallyHatch: { body: '#f4f6fb', accent: '#1d2330', style: 'hatch', rim: '#e8141b', stripe: '#e8141b', caliper: '#ffd21a' },
+
+  // Epic: supercars and the first futuristic shapes
+  spectraRoadster: { body: '#7a2cff', accent: '#14101f', style: 'roadster', rim: '#e3e6ec', trim: '#c27bff' },
+  umbraSuper: { body: '#1a1424', accent: '#0c0a10', style: 'super', rim: '#2a2236', trim: '#b23cff', finish: 'satin' },
+  tempestHyper: { body: '#0fb3c9', accent: '#0b1418', style: 'hyper', rim: '#1a1f24', caliper: '#ffd21a' },
+  toxinSuper: { body: '#59e81c', accent: '#0f1209', style: 'super', rim: '#14160f', trim: '#b4ff26' },
+  razorCyber: { body: '#c4cad4', accent: '#2a2f38', style: 'cyber', rim: '#8a8f99', finish: 'satin' },
+  auroraRoadster: { body: '#ff5fa8', accent: '#24101a', style: 'roadster', rim: '#f4f6fb', trim: '#ffb0d8' },
+  cycloneSport: { body: '#4a1aa8', accent: '#120a24', style: 'sport', rim: '#d9dde6', stripe: '#ffd21a' },
+  neonRushSuper: { body: '#0d0f16', accent: '#08090d', style: 'super', rim: '#151821', neon: '#ff2fd0' },
+
+  // Legendary: luxury, electric and concept icons
+  arcRoadster: { body: '#c8101e', accent: '#1a0a0c', style: 'roadster', rim: '#2a2c31', finish: 'pearl' },
+  sovereignLux: { body: '#0e0f14', accent: '#0a0a0d', style: 'luxury', rim: '#e3e6ec', roof: '#c9ced8', finish: 'pearl' },
+  regentLimo: { body: '#a8adb8', accent: '#1d2028', style: 'limo', rim: '#e3e6ec', roof: '#14161c', finish: 'pearl' },
+  monarchLux: { body: '#f6f4ee', accent: '#2a2620', style: 'luxury', rim: '#d8b04a', roof: '#d8b04a', caliper: '#d8b04a' },
+  titanCyber: { body: '#4a505c', accent: '#1a1d22', style: 'cyber', rim: '#2a2e36', trim: '#ffb21a', finish: 'satin' },
+  solarisHyper: { body: '#ffb21a', accent: '#1a1408', style: 'hyper', rim: '#141418', trim: '#fff1a8', finish: 'pearl' },
+  vortexCanopy: { body: '#1f6bff', accent: '#e3e6ec', style: 'canopy', rim: '#e3e6ec', trim: '#6ff2ff', finish: 'pearl' },
+  majestyLux: { body: '#5a0f1e', accent: '#1a070b', style: 'luxury', rim: '#e3e6ec', roof: '#e8e2d4', finish: 'pearl' },
+
+  // Mythic: glowing hypercars and starlit luxury
+  celestiaLux: { body: '#f2f4fa', accent: '#1d2330', style: 'luxury', rim: '#e3e6ec', roof: '#1a2a6a', neon: '#6ab8ff', finish: 'pearl' },
+  pullmanLimo: { body: '#4a0a18', accent: '#160408', style: 'limo', rim: '#e3e6ec', roof: '#0e0f14', trim: '#ffb21a', finish: 'pearl' },
+  plasmaRoadster: { body: '#1a0a24', accent: '#0c0510', style: 'roadster', rim: '#2a1a36', neon: '#ff3fe0' },
+  hyperionCanopy: { body: '#ffcf1f', accent: '#1a1408', style: 'canopy', rim: '#1a1a1f', neon: '#ffe14a', finish: 'pearl' },
+  overdriveCyber: { body: '#16181e', accent: '#0a0b0e', style: 'cyber', rim: '#1d2028', neon: '#ff2030', finish: 'satin' },
+  stormHyper: { body: '#0f1c3a', accent: '#081020', style: 'hyper', rim: '#162038', neon: '#18e8ff' },
+  apexHyper: { body: '#cfff1a', accent: '#121408', style: 'hyper', rim: '#141418', neon: '#7dff3a' },
+  nightfallRoadster: { body: '#0b0c12', accent: '#06070a', style: 'roadster', rim: '#1a1c24', neon: '#9a4aff' },
+  dragonfireCanopy: { body: '#c8101e', accent: '#1a0606', style: 'canopy', rim: '#1a1a1f', neon: '#ff7a1a' },
+
+  // Secret: one-of-a-kind dream machines
+  quantumCanopy: { body: '#dfe4ee', accent: '#1d2330', style: 'canopy', rim: '#e3e6ec', neon: '#18e8ff', finish: 'chrome' },
+  singularityCyber: { body: '#07070b', accent: '#040406', style: 'cyber', rim: '#12121a', neon: '#b23cff', finish: 'pearl' },
+  galaxyLux: { body: '#2a0f5c', accent: '#0e0620', style: 'luxury', rim: '#e3e6ec', roof: '#0a0820', neon: '#ff6ad5', finish: 'pearl' },
+  zeroGCanopy: { body: '#f4f6fb', accent: '#c9ced8', style: 'canopy', rim: '#f4f6fb', neon: '#6ff2ff', finish: 'pearl' },
+  neutronRoadster: { body: '#c9ced8', accent: '#1d2028', style: 'roadster', rim: '#14161c', neon: '#3dff5e', finish: 'chrome' },
+  eternityLimo: { body: '#f6f0dc', accent: '#2a2410', style: 'limo', rim: '#d8b04a', roof: '#d8b04a', neon: '#fff1a8', finish: 'pearl' },
+  voidHyper: { body: '#050507', accent: '#030304', style: 'hyper', rim: '#0e0e12', neon: '#ff1630', finish: 'satin' },
+  supernovaCanopy: { body: '#ff2f8e', accent: '#2b0b5c', style: 'canopy', rim: '#1a0a2a', neon: '#ffb21a', finish: 'pearl' },
+  hologramCyber: { body: '#b8c4e8', accent: '#2a2f48', style: 'cyber', rim: '#e3e6ec', neon: '#ff6af0', finish: 'chrome' },
 }
 // Placeholder HUD state for the parts that have no game rules yet (spins, offers).
 export const HUD_DEMO = {
@@ -326,6 +392,19 @@ export const FREE_CAR = {
   minutes: 30,
   car: { rarity: 'Legendary', name: 'Blaze', look: 'orangeHyper', bonus: 1.5 },
 }
+// The "New Update!" window (game/news.js): shown once per `version` to each player who has not seen
+// it, then never again (a signed-in player's seen version is kept by the server, backend news.ts, so it
+// is once per account on any device; a guest's / offline in this browser under saveKey). Bump `version`
+// (an integer) and rewrite the text for the next update. `showcase` = roster car names shown as cards.
+export const NEWS = {
+  saveKey: 'break-for-cars:news:v1',
+  version: 1,
+  title: 'New Update!',
+  headline: '50 NEW CARS!',
+  text: 'Every rarity now has 10 cars to collect, including Rolls-Royce, Mercedes-Maybach and Tesla legends. Rare cars now glow, sparkle and burn in your garage!',
+  showcase: ['Rolls-Royce Droptail', 'Tesla Cybercab', 'Mercedes-Maybach Exelero', 'Tesla Roadster SpaceX', 'Rolls-Royce Spectre', 'Mercedes-Maybach Pullman'],
+  button: 'Awesome!',
+}
 // Car variants ("mutations"). A block bought during an event can carry the event's
 // variant; the car inside earns `mult` x a Normal one. Shown on the block (tint +
 // label), on the car's label and in the Index. weight = how often an event picks it.
@@ -381,13 +460,45 @@ export const GAME_SETTINGS = {
 // Block rarity -> the cars that can come out of it, and their base $/s.
 export const RARITY_LADDER = ['Common', 'Uncommon', 'Epic', 'Legendary', 'Mythic', 'Secret']
 export const RARITY_INCOME = { Common: 3, Uncommon: 15, Epic: 120, Legendary: 600, Mythic: 3000, Secret: 20000 }
+// Ten cars per rarity; a block picks one of its rarity's cars at random. Names are saved
+// with each car (and in the Index), so never rename one that has shipped.
 export const CAR_ROSTER = {
-  Common: [{ name: 'Pebble', look: 'blueCoupe' }, { name: 'Dash', look: 'silverSport' }],
-  Uncommon: [{ name: 'Hornet', look: 'yellowSuper' }, { name: 'Zephyr', look: 'redSport' }],
-  Epic: [{ name: 'Glider', look: 'greenSuper' }, { name: 'Nebula', look: 'whiteHyper' }],
-  Legendary: [{ name: 'Blaze', look: 'orangeHyper' }, { name: 'Aurum', look: 'goldenCoupe' }],
-  Mythic: [{ name: 'Inferno', look: 'omega' }],
-  Secret: [{ name: 'Phantom', look: 'bolido' }],
+  Common: [
+    { name: 'Pebble', look: 'blueCoupe' }, { name: 'Dash', look: 'silverSport' }, { name: 'Bubble', look: 'mintHatch' },
+    { name: 'Scout', look: 'orangeHatch' }, { name: 'Cabby', look: 'taxiSedan' }, { name: 'Commuter', look: 'whiteSedan' },
+    { name: 'Breeze', look: 'skySedan' }, { name: 'Sprout', look: 'limeHatch' }, { name: 'Nimbus', look: 'lilacCoupe' },
+    { name: 'Rusty', look: 'rustHatch' },
+  ],
+  Uncommon: [
+    { name: 'Hornet', look: 'yellowSuper' }, { name: 'Zephyr', look: 'redSport' }, { name: 'Stallion', look: 'stallionMuscle' },
+    { name: 'Thunder', look: 'thunderMuscle' }, { name: 'Bandit', look: 'banditMuscle' }, { name: 'Riptide', look: 'tealSport' },
+    { name: 'Executive', look: 'execSedan' }, { name: 'Comet', look: 'cometCoupe' }, { name: 'Voltage', look: 'voltHatch' },
+    { name: 'Rally', look: 'rallyHatch' },
+  ],
+  Epic: [
+    { name: 'Glider', look: 'greenSuper' }, { name: 'Nebula', look: 'whiteHyper' }, { name: 'Spectra', look: 'spectraRoadster' },
+    { name: 'Umbra', look: 'umbraSuper' }, { name: 'Tempest', look: 'tempestHyper' }, { name: 'Toxin', look: 'toxinSuper' },
+    { name: 'Razor', look: 'razorCyber' }, { name: 'Aurora', look: 'auroraRoadster' }, { name: 'Cyclone', look: 'cycloneSport' },
+    { name: 'Neon Rush', look: 'neonRushSuper' },
+  ],
+  Legendary: [
+    { name: 'Blaze', look: 'orangeHyper' }, { name: 'Aurum', look: 'goldenCoupe' }, { name: 'Tesla Roadster', look: 'arcRoadster' },
+    { name: 'Rolls-Royce Phantom', look: 'sovereignLux' }, { name: 'Mercedes-Maybach S680', look: 'regentLimo' }, { name: 'Rolls-Royce Ghost', look: 'monarchLux' },
+    { name: 'Titan', look: 'titanCyber' }, { name: 'Solaris', look: 'solarisHyper' }, { name: 'Vortex', look: 'vortexCanopy' },
+    { name: 'Rolls-Royce Wraith', look: 'majestyLux' },
+  ],
+  Mythic: [
+    { name: 'Inferno', look: 'omega' }, { name: 'Rolls-Royce Spectre', look: 'celestiaLux' }, { name: 'Mercedes-Maybach Pullman', look: 'pullmanLimo' },
+    { name: 'Plasma', look: 'plasmaRoadster' }, { name: 'Hyperion', look: 'hyperionCanopy' }, { name: 'Overdrive', look: 'overdriveCyber' },
+    { name: 'Stormbreaker', look: 'stormHyper' }, { name: 'Apex', look: 'apexHyper' }, { name: 'Nightfall', look: 'nightfallRoadster' },
+    { name: 'Dragonfire', look: 'dragonfireCanopy' },
+  ],
+  Secret: [
+    { name: 'Phantom', look: 'bolido' }, { name: 'Quantum', look: 'quantumCanopy' }, { name: 'Singularity', look: 'singularityCyber' },
+    { name: 'Rolls-Royce Droptail', look: 'galaxyLux' }, { name: 'Zero-G', look: 'zeroGCanopy' }, { name: 'Tesla Roadster SpaceX', look: 'neutronRoadster' },
+    { name: 'Mercedes-Maybach Exelero', look: 'eternityLimo' }, { name: 'Void Runner', look: 'voidHyper' }, { name: 'Supernova', look: 'supernovaCanopy' },
+    { name: 'Tesla Cybercab', look: 'hologramCyber' },
+  ],
 }
 
 export const SPAWN_FACING = -Math.PI / 2 // yaw the character faces on spawn (PI = toward -Z; -PI/2 = west, at the garage)

@@ -73,7 +73,10 @@ export function createIndex(layer, { sfx }) {
         const card = document.createElement('div')
         card.className = `index-card${have ? '' : ' unknown'}`
         card.style.setProperty('--ray', tab.id === 'Normal' ? 'rgba(255,255,255,0.12)' : `color-mix(in srgb, ${tab.color} 45%, transparent)`)
-        card.innerHTML = `<div class="fuse-name ol">${c.name}</div><img alt="" src="${icons[c.look]}"><div class="fuse-line ol" style="color:${vColor}">${tab.id}</div><div class="fuse-line ol" style="color:${rarityColor(c.rarity)}">${c.rarity}</div>`
+        // short words never split ("Rolls-Royce" stays whole; "Mercedes-Maybach" may break at
+        // its hyphen); long names get a smaller font
+        const name = c.name.split(' ').map((w) => (w.length <= 11 ? `<span class="nw">${w}</span>` : w)).join(' ')
+        card.innerHTML = `<div class="fuse-name ol${c.name.length > 12 ? ' long' : ''}">${name}</div><img alt="" src="${icons[c.look]}"><div class="fuse-line ol" style="color:${vColor}">${tab.id}</div><div class="fuse-line ol" style="color:${rarityColor(c.rarity)}">${c.rarity}</div>`
         return card
       }),
     )

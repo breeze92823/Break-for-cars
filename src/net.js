@@ -12,6 +12,8 @@
 // asked for once joined (`tutorialSync`), answered with `tutorial` { step }, raised by `tutorial`.
 // The free car's play time / claim for a signed-in player (backend freeCar.ts): `freeCarSync` once
 // joined, answered with `freeCar`; `freeCarClaim` answered with `freeCarClaim`.
+// The "New Update!" window's seen version (backend news.ts): `newsSync` once joined, answered with
+// `news` { tracked, seen }; `newsSeen` when it is closed.
 // Never throws and never blocks play: without a server the game runs alone on the home garage.
 import { Client } from '@colyseus/sdk'
 import { DEV_MODE, LOBBY, NET, SERVER_URL } from './config.js'
@@ -50,6 +52,8 @@ const hooks = {
   onTutorial: () => {}, // (step) the server's step for this account (game.syncTutorial)
   freeCar: () => null, // { played, claimed } this browser counted for the free car (game.freeCarSnapshot)
   onFreeCar: () => {}, // (msg) the server's `freeCar` { tracked, played, claimed, need } (game.syncFreeCar)
+  news: () => 0, // the "New Update!" version this browser has seen (game.newsSeen)
+  onNews: () => {}, // (msg) the server's `news` { tracked, seen } (game.syncNews)
 }
 
 function send(type, payload) {
@@ -118,6 +122,10 @@ export function claimFreeCar() {
     send('freeCarClaim', {})
   })
 }
+
+// --- New Update window (backend news.ts; client game/news.js) -----------------------------------
+// Closing it is saved for the account; one closed offline goes up with the next join's `newsSync`.
+export const sendNewsSeen = (version) => net.connected && send('newsSeen', { version })
 
 // --- Trades (backend trades.ts; client game/trade.js) ------------------------------------------
 // The server brokers requests, offers and accepts; the game swaps the cars. Server messages reach the
@@ -190,6 +198,8 @@ function attach(room, relay) {
   room.onMessage('freeCar', (m) => hooks.onFreeCar(m))
   room.onMessage('freeCarClaim', (m) => freeCarWaiting?.(m))
   send('freeCarSync', hooks.freeCar() ?? {})
+  room.onMessage('news', (m) => hooks.onNews(m))
+  send('newsSync', { seen: hooks.news() })
   for (const type of TRADE_EVENTS) room.onMessage(type, (m) => tradeHandler?.(type, m))
   room.onLeave(() => {
     if (net.room !== room) return
@@ -276,7 +286,8 @@ function tick() {
   }
 }
 
-// pose(), loadout(), base(), stats(), plot(), tutorial(), onTutorial(step), freeCar(), onFreeCar(msg): see `hooks`.
+// pose(), loadout(), base(), stats(), plot(), tutorial(), onTutorial(step), freeCar(), onFreeCar(msg),
+// news(), onNews(msg): see `hooks`.
 export function initNet(fns = {}) {
   Object.assign(hooks, fns)
   if (!hasServer()) return console.info('[net] no server configured; playing alone')

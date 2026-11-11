@@ -62,7 +62,11 @@ const TYRE_W = 0.34
 //  gh      cabin: xa windscreen base, xb roof front, xc roof rear, xd rear base,
 //          roof height, base width (of the body width), top tumblehome,
 //          rear = 'glass' fastback window | 'louvre' slatted engine cover
-//  wing    'low' | 'big' | 'lip' | 'duck'
+//  wing    'low' | 'big' | 'lip' | 'duck' | 'none'
+//  exhaust 'center' | 'twin' | 'quad' | 'none'
+//  options grille ('tall' | 'wide' | 'mesh'), mascot, chromeLine, hoodBulge,
+//          lightBar, glassRoof, fin, mirrors: false, gh.rearPad, gh.n (cabin
+//          squareness), cabin ('roof' = spec.roof colour, 'canopy' = all glass)
 const STYLES = {
   super: {
     top: [[2.3, 0.42], [2.14, 0.58], [1.75, 0.69], [1.1, 0.78], [0.6, 0.83], [-0.4, 0.88], [-1.5, 0.92], [-2.05, 0.9], [-2.3, 0.8]],
@@ -91,6 +95,76 @@ const STYLES = {
     pF: 3.8, pR: 4, front: 0.86, sf: 0.52, nu: 2.9, haunch: 0.05,
     gh: { xa: 0.5, xb: -0.25, xc: -0.9, xd: -2.2, roof: 1.27, w: 0.8, tumble: 0.3, rear: 'glass', split: -0.8 },
     wing: 'duck', intakes: false, scoop: false, exhaust: 'twin', head: 'round', tail: 'bar', gills: true, hoodVents: false,
+  },
+  // Compact city hatchback: tall cabin, short nose, near-vertical tailgate.
+  hatch: {
+    top: [[2.28, 0.52], [2.12, 0.68], [1.7, 0.82], [1.1, 0.9], [0.6, 0.94], [-0.6, 0.98], [-1.6, 1.0], [-2.1, 0.98], [-2.28, 0.84]],
+    headLamp: [0.42, 0.06, 0.5, 0.7],
+    pF: 3.2, pR: 3, front: 0.9, sf: 0.55, nu: 2.6, haunch: 0.02,
+    gh: { xa: 0.85, xb: 0.1, xc: -1.75, xd: -2.24, roof: 1.5, w: 0.84, tumble: 0.26, rear: 'glass', split: -1.0, rearPad: 0.06 },
+    wing: 'none', intakes: false, scoop: false, exhaust: 'twin', head: 'round', tail: 'round', gills: false, hoodVents: false, grille: 'mesh', diffuser: false,
+  },
+  // Four-door saloon: long glasshouse with a B-pillar and a short boot.
+  sedan: {
+    top: [[2.32, 0.52], [2.16, 0.66], [1.7, 0.78], [1.0, 0.86], [0.4, 0.89], [-0.8, 0.92], [-1.7, 0.93], [-2.15, 0.9], [-2.32, 0.78]],
+    headLamp: [0.5, 0.06, 0.48, 0.66],
+    pF: 4, pR: 4.2, front: 0.88, sf: 0.55, nu: 3.2, haunch: 0.02,
+    gh: { xa: 0.6, xb: -0.05, xc: -1.15, xd: -1.85, roof: 1.4, w: 0.82, tumble: 0.28, rear: 'glass', split: -0.55 },
+    wing: 'lip', intakes: false, scoop: false, exhaust: 'twin', head: 'slit', tail: 'bar', gills: false, hoodVents: false, grille: 'mesh', diffuser: false,
+  },
+  // Muscle car: long bonnet with a power bulge, cabin pushed back, square ends.
+  muscle: {
+    top: [[2.34, 0.56], [2.2, 0.72], [1.8, 0.84], [1.0, 0.9], [0.2, 0.92], [-0.8, 0.93], [-1.8, 0.94], [-2.18, 0.92], [-2.34, 0.8]],
+    headLamp: [0.35, 0.05, 0.42, 0.62],
+    pF: 6, pR: 6, front: 0.92, sf: 0.56, nu: 3.8, haunch: 0.06,
+    gh: { xa: 0.15, xb: -0.5, xc: -1.2, xd: -2.0, roof: 1.3, w: 0.78, tumble: 0.3, rear: 'glass', split: null, door: -0.95 },
+    wing: 'duck', intakes: false, scoop: false, exhaust: 'quad', head: 'round', tail: 'bar', gills: false, hoodVents: false, grille: 'mesh', hoodBulge: true,
+  },
+  // Stately luxury saloon (Rolls-Royce-inspired): tall flat bonnet, upright
+  // chrome temple grille with a mascot, chrome waistline, two-tone roof.
+  luxury: {
+    top: [[2.36, 0.72], [2.28, 0.9], [2.0, 1.0], [1.2, 1.03], [0.4, 1.04], [-0.8, 1.04], [-1.8, 1.03], [-2.2, 1.0], [-2.36, 0.88]],
+    headLamp: [0.22, 0.05, 0.5, 0.6],
+    pF: 9, pR: 7, front: 0.94, sf: 0.6, nu: 4.5, haunch: 0,
+    gh: { xa: 0.45, xb: -0.05, xc: -1.35, xd: -1.95, roof: 1.62, w: 0.8, tumble: 0.22, rear: 'glass', split: -0.65, rearPad: 0.2 },
+    wing: 'none', intakes: false, scoop: false, exhaust: 'none', head: 'slit', tail: 'bar', gills: false, hoodVents: false,
+    grille: 'tall', mascot: true, chromeLine: true, cabin: 'roof', diffuser: false,
+  },
+  // Ultra-luxury limousine (Maybach-inspired): long sleek glasshouse, wide
+  // chrome pinstripe grille, chrome waistline, two-tone paint.
+  limo: {
+    top: [[2.34, 0.64], [2.24, 0.8], [1.9, 0.92], [1.1, 0.97], [0.4, 0.99], [-0.8, 1.0], [-1.8, 0.99], [-2.2, 0.95], [-2.34, 0.82]],
+    headLamp: [0.32, 0.05, 0.48, 0.62],
+    pF: 6, pR: 5.5, front: 0.9, sf: 0.58, nu: 3.8, haunch: 0,
+    gh: { xa: 0.55, xb: -0.05, xc: -1.3, xd: -2.0, roof: 1.52, w: 0.8, tumble: 0.25, rear: 'glass', split: -0.6, rearPad: 0.25 },
+    wing: 'none', intakes: false, scoop: false, exhaust: 'none', head: 'slit', tail: 'bar', gills: false, hoodVents: false,
+    grille: 'wide', chromeLine: true, cabin: 'roof', diffuser: false,
+  },
+  // Electric roadster (Tesla Roadster-inspired): smooth and low, glass targa
+  // roof, no grille or exhausts, aero wheels.
+  roadster: {
+    top: [[2.3, 0.42], [2.14, 0.56], [1.7, 0.66], [1.0, 0.74], [0.4, 0.79], [-0.6, 0.86], [-1.6, 0.9], [-2.1, 0.88], [-2.3, 0.76]],
+    headLamp: [0.38, 0.07, 0.48, 0.62],
+    pF: 4, pR: 5, front: 0.84, sf: 0.48, nu: 2.4, haunch: 0.08,
+    gh: { xa: 0.7, xb: -0.05, xc: -0.85, xd: -1.95, roof: 1.15, w: 0.76, tumble: 0.36, rear: 'glass', split: null, door: -0.55 },
+    wing: 'none', intakes: false, scoop: false, exhaust: 'none', head: 'slit', tail: 'bar', gills: false, hoodVents: false, glassRoof: true,
+  },
+  // Futuristic faceted wedge: sharp creases, light bars front and back.
+  cyber: {
+    top: [[2.32, 0.5], [2.2, 0.62], [1.6, 0.72], [0.8, 0.8], [0.2, 0.84], [-0.8, 0.9], [-1.8, 0.94], [-2.2, 0.94], [-2.32, 0.86]],
+    headLamp: [0.2, 0.04, 0.44, 0.5],
+    pF: 8, pR: 9, front: 0.9, sf: 0.6, nu: 9, haunch: 0.04,
+    gh: { xa: 0.8, xb: 0.05, xc: -0.9, xd: -2.05, roof: 1.2, w: 0.78, tumble: 0.4, rear: 'glass', split: null, door: -0.45, n: 6 },
+    wing: 'lip', intakes: false, scoop: false, exhaust: 'none', head: 'slit', tail: 'bar', gills: false, hoodVents: false, lightBar: true,
+  },
+  // Concept hypercar with a jet-fighter glass canopy and a shark fin.
+  canopy: {
+    top: [[2.34, 0.36], [2.18, 0.5], [1.6, 0.6], [1.0, 0.66], [0.4, 0.7], [-0.6, 0.8], [-1.6, 0.86], [-2.1, 0.86], [-2.34, 0.76]],
+    headLamp: [0.36, 0.08, 0.46, 0.6],
+    pF: 4, pR: 6, front: 0.74, sf: 0.45, nu: 2.6, haunch: 0.12,
+    gh: { xa: 1.05, xb: 0.3, xc: -0.5, xd: -1.5, roof: 1.12, w: 0.58, tumble: 0.45, rear: 'glass', split: null, door: -0.3, n: 2 },
+    wing: 'big', intakes: true, scoop: false, exhaust: 'none', head: 'slit', tail: 'bar', gills: false, hoodVents: true,
+    cabin: 'canopy', lightBar: true, fin: true, mirrors: false,
   },
 }
 
@@ -289,7 +363,7 @@ function makeCabin(st, B) {
     const ends = 0.82 + 0.18 * Math.sin(Math.PI * clamp01(t)) ** 0.5
     return B.half(x) * g.w * ends
   }
-  const N = 2.6
+  const N = g.n ?? 2.6
   const point = (x, v) => {
     const w = gw(x)
     if (v < 0) {
@@ -495,6 +569,12 @@ function addWheel(P, x, z, side, spokes, front) {
       })
     }
   }
+  if (spokes.aero) {
+    // aero cover over the spokes: a rim-colour disc with a dark slot ring
+    P.put('rim', geoOnce('aero', () => new CircleGeometry(0.236, 32)), x, y, face - side * 0.006, { ry: side > 0 ? 0 : Math.PI })
+    P.put('dark', geoOnce('aeroSlots', () => new TorusGeometry(0.17, 0.012, 4, 32)), x, y, face - side * 0.002)
+    P.put('dark', geoOnce('aeroSlots2', () => new TorusGeometry(0.215, 0.006, 4, 32)), x, y, face - side * 0.002)
+  }
   // hub, centre lock and lug nuts
   P.put('rim', geoOnce('hub', () => new CylinderGeometry(0.07, 0.078, 0.05, 20).rotateX(Math.PI / 2)), x, y, face - side * 0.035)
   P.put('chrome', geoOnce('nut', () => new CylinderGeometry(0.032, 0.032, 0.03, 6).rotateX(Math.PI / 2)), x, y, face - side * 0.0)
@@ -512,9 +592,22 @@ function geoOnce(key, make) {
 }
 
 // --- the whole car, per style -----------------------------------------------------------------------
-const SPOKES = { super: { n: 5, twin: true }, hyper: { n: 7, twin: false }, sport: { n: 5, twin: false }, coupe: { n: 10, twin: false } }
+const SPOKES = {
+  super: { n: 5, twin: true },
+  hyper: { n: 7, twin: false },
+  sport: { n: 5, twin: false },
+  coupe: { n: 10, twin: false },
+  hatch: { n: 5, twin: false },
+  sedan: { n: 6, twin: false },
+  muscle: { n: 5, twin: true },
+  luxury: { n: 12, twin: false },
+  limo: { n: 10, twin: true },
+  roadster: { n: 5, twin: false, aero: true },
+  cyber: { n: 6, twin: false, aero: true },
+  canopy: { n: 7, twin: false, aero: true },
+}
 
-function buildParts(styleKey, { trim, neonKit }) {
+function buildParts(styleKey, { trim, neonKit, stripe }) {
   const st = STYLES[styleKey]
   const B = makeBody(st)
   const C = makeCabin(st, B)
@@ -542,7 +635,9 @@ function buildParts(styleKey, { trim, neonKit }) {
   // Cabin loft.
   const cabXs = []
   for (let i = 0; i <= 34; i++) cabXs.push(g.xd + ((g.xa - g.xd) * i) / 34)
-  P.add('body', loft(cabXs, C.ring, Math.PI / 3))
+  // the cabin is body colour, a contrasting roof colour (two-tone) or all glass (canopy)
+  const canopy = st.cabin === 'canopy'
+  P.add(canopy ? 'glass' : st.cabin === 'roof' ? 'roof' : 'body', loft(cabXs, C.ring, Math.PI / 3))
 
   // Wheel-well liners and the floor pan.
   for (const ax of [AXLE_F, AXLE_R]) {
@@ -557,6 +652,7 @@ function buildParts(styleKey, { trim, neonKit }) {
   // --- glass: windscreen, side windows, rear glass, each in a black frame ---
   const thA = 0.64 // v where the side windows end and the roof / screens begin
   const glass = (map, frameMap) => {
+    if (canopy) return // the whole cabin is glass already
     P.add('trim', patch(cp, frameMap, { nx: 14, nv: 8, off: 0.004 }))
     P.add('glass', patch(cp, map, { nx: 14, nv: 8, off: 0.009 }))
   }
@@ -579,8 +675,18 @@ function buildParts(styleKey, { trim, neonKit }) {
     const qMap = (pad) => (a, b) => [q0 - pad + (q1 - q0 + pad * 2) * a, 0.2 - pad + (thA - 0.28 + pad * 2) * b * (0.55 + 0.45 * a)]
     glass(qMap(0), qMap(0.03))
   }
+  if (canopy) {
+    // canopy: a slim body-colour spine down the middle and a frame where it meets the body
+    P.add('accentGloss', patch(cp, rect(g.xd + 0.15, g.xa - 0.2, 0.975, 1), { nx: 20, nv: 1, off: 0.008 }))
+    P.add('trim', patch(cp, rect(g.xd + 0.02, g.xa - 0.02, 0.0, 0.04), { nx: 24, nv: 1, off: 0.006 }))
+  }
+  if (st.glassRoof) {
+    // glass targa panel between the windscreen and the rear glass
+    glass(rect(g.xc + 0.1, g.xb - 0.02, thA + 0.12, 1), rect(g.xc + 0.07, g.xb + 0.01, thA + 0.09, 1))
+  }
   if (g.rear === 'glass') {
-    glass(rect(g.xd + 0.32, g.xc - 0.03, thA + 0.06, 1), rect(g.xd + 0.29, g.xc - 0.005, thA + 0.03, 1))
+    const pad = g.rearPad ?? 0.32
+    glass(rect(g.xd + pad, g.xc - 0.03, thA + 0.06, 1), rect(g.xd + pad - 0.03, g.xc - 0.005, thA + 0.03, 1))
   } else {
     // engine-cover louvres: a dark panel with body-colour slats over it
     const x0 = g.xd + 0.18
@@ -645,11 +751,53 @@ function buildParts(styleKey, { trim, neonKit }) {
       P.add('drl', patch(bp, (a, b) => lamp(0)(f - 0.07 + a * 0.14, 0.3 + b * 0.45), { nx: 3, nv: 3, off: 0.014 }))
     }
   }
-  P.add('trim', patch(bp, faceMap(0.05, 0.38, 0.2, 0.4), { nx: 8, nv: 4, off: 0.005 }))
-  P.add('trim', patch(bp, faceMap(0.5, 0.86, 0.21, 0.38), { nx: 8, nv: 4, off: 0.005 }))
-  for (let i = 0; i < 4; i++) {
-    const v = 0.24 + i * 0.04
-    P.add('dark', patch(bp, faceMap(0.07, 0.36, v - 0.006, v + 0.006), { nx: 6, nv: 1, off: 0.009 }))
+  if (!st.grille) {
+    // sports nose: a centre intake with slats and a side intake each corner
+    P.add('trim', patch(bp, faceMap(0.05, 0.38, 0.2, 0.4), { nx: 8, nv: 4, off: 0.005 }))
+    P.add('trim', patch(bp, faceMap(0.5, 0.86, 0.21, 0.38), { nx: 8, nv: 4, off: 0.005 }))
+    for (let i = 0; i < 4; i++) {
+      const v = 0.24 + i * 0.04
+      P.add('dark', patch(bp, faceMap(0.07, 0.36, v - 0.006, v + 0.006), { nx: 6, nv: 1, off: 0.009 }))
+    }
+  } else {
+    // grille: [half width, v bottom, v top, bar spacing, frame role, bars vertical?]
+    const [gw, g0, g1, step, frame, vertical] = {
+      tall: [0.3, 0.24, 0.66, 0.032, 'chrome', true],
+      wide: [0.52, 0.22, 0.46, 0.04, 'chrome', true],
+      mesh: [0.62, 0.21, 0.44, 0.045, 'trim', false],
+    }[st.grille]
+    P.add(frame, patch(bp, faceMap(0, gw, g0, g1), { nx: 8, nv: 6, off: 0.008 }))
+    P.add('dark', patch(bp, faceMap(0, gw - 0.035, g0 + 0.025, g1 - 0.025), { nx: 8, nv: 6, off: 0.012 }))
+    const barRole = frame === 'chrome' ? 'chrome' : 'trim'
+    if (vertical) {
+      for (let f = 0.006; f < gw - 0.04; f += step) P.add(barRole, patch(bp, faceMap(f, f + 0.012, g0 + 0.025, g1 - 0.025), { nx: 1, nv: 6, off: 0.016 }))
+    } else {
+      for (let v = g0 + 0.045; v < g1 - 0.03; v += step) P.add(barRole, patch(bp, faceMap(0, gw - 0.035, v - 0.005, v + 0.005), { nx: 8, nv: 1, off: 0.016 }))
+    }
+    // slim lower intake under the bumper line
+    P.add('trim', patch(bp, faceMap(0.12, 0.8, 0.185, 0.205), { nx: 8, nv: 1, off: 0.006 }))
+  }
+  if (st.lightBar) {
+    // full-width light bar across the nose
+    P.add('trim', patch(bp, faceMap(0, 0.95, 0.37, 0.415), { nx: 16, nv: 2, off: 0.01 }))
+    P.add('drl', patch(bp, faceMap(0, 0.93, 0.385, 0.4), { nx: 16, nv: 1, off: 0.016 }))
+  }
+  if (st.mascot) {
+    // chrome bonnet mascot on a plinth at the top of the grille
+    const mx0 = fx - 0.16
+    const my = B.top(mx0)
+    P.put('chrome', geoOnce('plinth', () => new CylinderGeometry(0.035, 0.045, 0.04, 12)), mx0, my + 0.015, 0)
+    P.put('chrome', geoOnce('figure', () => new BoxGeometry(0.035, 0.15, 0.025)), mx0 - 0.02, my + 0.1, 0, { rz: 0.45 })
+    P.put('chrome', geoOnce('wings', () => new BoxGeometry(0.1, 0.05, 0.11)), mx0 - 0.06, my + 0.15, 0, { rz: 0.6, sz: 1 })
+  }
+  if (st.hoodBulge) {
+    // raised power bulge down the bonnet with a dark scoop mouth
+    P.add('body', patch(bp, rect(AXLE_F - 0.85, fx - 0.5, 0.9, 1), { nx: 8, nv: 3, off: 0.055 }))
+    P.add('dark', patch(bp, rect(fx - 0.56, fx - 0.5, 0.92, 1), { nx: 1, nv: 3, off: 0.06 }))
+  }
+  if (st.chromeLine) {
+    // chrome waistline from nose to tail
+    P.add('chrome', patch(bp, rect(rx + 0.35, fx - 0.35, V_SHOULDER - 0.012, V_SHOULDER + 0.002), { nx: 40, nv: 1, off: 0.012 }))
   }
   // splitter: a thin blade following the nose outline
   P.add('accent', outlineBlade(B, AXLE_F + ARCH_R + 0.02, fx + 0.04, 0.035, 0.19, 0.035))
@@ -665,12 +813,14 @@ function buildParts(styleKey, { trim, neonKit }) {
     }
   }
   // mirrors on stalks at the door's front top corner
-  const mx = g.xa - 0.16
-  const mp = cp(mx, 0.04)
-  const mirror = geoOnce('mirror', () => new SphereGeometry(0.08, 14, 10))
-  P.pair('body', mirror, mx - 0.03, mp[1] + 0.11, mp[2] + 0.09, { sx: 1.3, sy: 0.62, sz: 0.9 })
-  P.pair('trim', geoOnce('mirrorGlass', () => new CircleGeometry(0.06, 14)), mx - 0.132, mp[1] + 0.11, mp[2] + 0.095, { ry: -Math.PI / 2, sy: 0.62 })
-  P.pair('trim', geoOnce('stalk', () => new BoxGeometry(0.06, 0.1, 0.025)), mx, mp[1] + 0.05, mp[2] + 0.03, { rx: -0.7 })
+  if (st.mirrors !== false) {
+    const mx = g.xa - 0.16
+    const mp = cp(mx, 0.04)
+    const mirror = geoOnce('mirror', () => new SphereGeometry(0.08, 14, 10))
+    P.pair('body', mirror, mx - 0.03, mp[1] + 0.11, mp[2] + 0.09, { sx: 1.3, sy: 0.62, sz: 0.9 })
+    P.pair('trim', geoOnce('mirrorGlass', () => new CircleGeometry(0.06, 14)), mx - 0.132, mp[1] + 0.11, mp[2] + 0.095, { ry: -Math.PI / 2, sy: 0.62 })
+    P.pair('trim', geoOnce('stalk', () => new BoxGeometry(0.06, 0.1, 0.025)), mx, mp[1] + 0.05, mp[2] + 0.03, { rx: -0.7 })
+  }
 
   // --- rear: tail lights, diffuser, exhausts, wing ---
   const rw = (f) => B.xAtWidth(f, -1)
@@ -691,12 +841,14 @@ function buildParts(styleKey, { trim, neonKit }) {
   P.add('tail', patch(bp, tailMap(0, 0.2, 0.83, 0.85), { nx: 3, nv: 1, off: 0.008 }))
   // diffuser
   P.add('trim', patch(bp, tailMap(0, 0.92, 0.2, 0.33), { nx: 10, nv: 3, off: 0.004 }))
-  P.put('accent', geoOnce('diffuser', () => new BoxGeometry(1, 1, 1)), rx + 0.25, 0.27, 0, { sx: 0.5, sy: 0.12, sz: W * 0.78 })
-  for (let i = -3; i <= 3; i++) P.put('dark', geoOnce('fin', () => new BoxGeometry(0.42, 0.16, 0.025)), rx + 0.23, 0.28, i * 0.2, { rz: -0.25 })
+  if (st.diffuser !== false) {
+    P.put('accent', geoOnce('diffuser', () => new BoxGeometry(1, 1, 1)), rx + 0.25, 0.27, 0, { sx: 0.5, sy: 0.12, sz: W * 0.78 })
+    for (let i = -3; i <= 3; i++) P.put('dark', geoOnce('fin', () => new BoxGeometry(0.42, 0.16, 0.025)), rx + 0.23, 0.28, i * 0.2, { rz: -0.25 })
+  }
   // exhausts
   const pipe = geoOnce('pipe', () => new CylinderGeometry(0.055, 0.06, 0.25, 16, 1, true).rotateZ(Math.PI / 2))
   const pipeIn = geoOnce('pipeIn', () => new CircleGeometry(0.05, 14).rotateY(-Math.PI / 2))
-  const pipes = st.exhaust === 'center' ? [[0, 0.5]] : st.exhaust === 'twin' ? [[0.28, 0.36], [-0.28, 0.36]] : [[0.62, 0.32], [0.48, 0.32], [-0.48, 0.32], [-0.62, 0.32]]
+  const pipes = st.exhaust === 'none' ? [] : st.exhaust === 'center' ? [[0, 0.5]] : st.exhaust === 'twin' ? [[0.28, 0.36], [-0.28, 0.36]] : [[0.62, 0.32], [0.48, 0.32], [-0.48, 0.32], [-0.62, 0.32]]
   for (const [pz, py] of pipes) {
     const big = st.exhaust === 'center'
     const s = big ? 1.5 : 1
@@ -751,7 +903,37 @@ function buildParts(styleKey, { trim, neonKit }) {
     P.put('dark', geoOnce('scoopMouth', () => new CircleGeometry(0.1, 14, 0, Math.PI).rotateY(Math.PI / 2)), sx + 0.27, ry + 0.0, 0, { sz: 1.2, sy: 0.8 })
   }
 
+  if (st.fin) {
+    // shark fin down the engine cover behind the canopy
+    const f0 = rx + 0.35
+    const f1 = g.xd + 0.25
+    const fy = B.top((f0 + f1) / 2)
+    P.put('accentGloss', geoOnce('fin', () => {
+      const s = new Shape()
+      s.moveTo(0, 0)
+      s.lineTo(1, 0)
+      s.quadraticCurveTo(0.35, 0.25, 0, 1)
+      s.lineTo(0, 0)
+      return new ExtrudeGeometry(s, { depth: 0.03, bevelEnabled: false, curveSegments: 8 }).translate(0, 0, -0.015)
+    }), f0, fy - 0.05, 0, { sx: f1 - f0, sy: 0.32 })
+  }
+
   // --- options ---
+  if (stripe) {
+    // twin racing stripes over the bonnet, cabin and deck
+    // one band each side of the centreline; on a power bulge the bonnet part rides on the bulge
+    const s0 = 0.9
+    const s1 = 0.97
+    const band = (surf, x0, x1, off) => P.add('stripe', patch(surf, rect(x0, x1, s0, s1), { nx: 14, nv: 1, off }))
+    band(bp, rx + 0.04, g.xd, 0.008)
+    if (st.hoodBulge) {
+      band(bp, g.xa, AXLE_F - 0.85, 0.008)
+      band(bp, AXLE_F - 0.85, fx - 0.5, 0.062)
+      band(bp, fx - 0.5, fx - 0.04, 0.008)
+    } else band(bp, g.xa, fx - 0.04, 0.008)
+    if (!canopy && !st.glassRoof) band(cp, g.xc, g.xb, 0.011) // roof only, never over the glass
+    if (!canopy && g.rear === 'louvre') band(cp, g.xd, g.xc - 0.25, 0.026)
+  }
   if (trim) {
     // neon pinstripe along the sills
     P.add('trimNeon', patch(bp, rect(AXLE_R + ARCH_R + 0.05, AXLE_F - ARCH_R - 0.05, V_SIDE + 0.02, V_SIDE + 0.04), { nx: 10, nv: 1, off: 0.012 }))
@@ -777,10 +959,10 @@ function buildParts(styleKey, { trim, neonKit }) {
 }
 
 const partsCache = new Map()
-function partsFor(style, trim, neonKit) {
-  const key = `${style}|${trim ? 1 : 0}|${neonKit ? 1 : 0}`
+function partsFor(style, trim, neonKit, stripe) {
+  const key = `${style}|${trim ? 1 : 0}|${neonKit ? 1 : 0}|${stripe ? 1 : 0}`
   let p = partsCache.get(key)
-  if (!p) partsCache.set(key, (p = buildParts(style, { trim, neonKit })))
+  if (!p) partsCache.set(key, (p = buildParts(style, { trim, neonKit, stripe })))
   return p
 }
 
@@ -805,7 +987,7 @@ function mats() {
   return shared
 }
 
-const SHADOW_ROLES = new Set(['body', 'tyre', 'accent', 'accentGloss', 'rim'])
+const SHADOW_ROLES = new Set(['body', 'roof', 'glass', 'tyre', 'accent', 'accentGloss', 'rim'])
 
 // Builds one car from a CARS key or a spec object.
 export function buildCar(key) {
@@ -815,16 +997,21 @@ export function buildCar(key) {
   const car = new Group()
   car.name = `car:${typeof key === 'string' ? key : style}`
 
-  const body = paint(spec.body, spec.neon ? { metalness: 0.5, roughness: 0.25 } : undefined)
+  // finish: 'chrome' mirror paint, 'satin' matte metal, 'pearl' deep metallic; neon cars default to pearl
+  const FINISH = { chrome: { metalness: 1, roughness: 0.08 }, satin: { metalness: 0.6, roughness: 0.42 }, pearl: { metalness: 0.5, roughness: 0.25 } }
+  const finish = FINISH[spec.finish] ?? (spec.neon ? FINISH.pearl : undefined)
+  const body = paint(spec.body, finish)
   const accent = new MeshStandardMaterial({ color: spec.accent, roughness: 0.45, metalness: 0.3, side: DoubleSide })
   const accentGloss = new MeshPhysicalMaterial({ color: spec.accent, roughness: 0.2, metalness: 0.4, clearcoat: 1, side: DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 })
   const rim = new MeshStandardMaterial({ color: spec.rim, roughness: 0.25, metalness: 0.85, side: DoubleSide })
   const caliper = new MeshStandardMaterial({ color: spec.caliper ?? '#e0261d', roughness: 0.4 })
   const byRole = { body, accent, accentGloss, rim, caliper, ...M }
+  byRole.roof = spec.roof ? paint(spec.roof, finish) : body
+  if (spec.stripe) byRole.stripe = new MeshPhysicalMaterial({ color: spec.stripe, roughness: 0.3, metalness: 0.2, clearcoat: 1, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 })
   if (spec.trim) byRole.trimNeon = neon(spec.trim, 1.6)
   if (spec.neon) byRole.neon = neon(spec.neon, 3.2)
 
-  const parts = partsFor(style, !!spec.trim, !!spec.neon)
+  const parts = partsFor(style, !!spec.trim, !!spec.neon, !!spec.stripe)
   for (const [role, geo] of parts.roles) {
     const mat = byRole[role]
     if (!mat) continue

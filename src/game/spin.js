@@ -1,7 +1,7 @@
 // The Spin Wheel window: a big six-wedge wheel (SPIN_WHEEL.rewards, clockwise
 // from the top) with each reward's picture, label and odds, a pointer at the
 // top, an X, and one green "Spin (Nx)" button with "Free Spin in: mm:ss" over
-// it. One free spin every SPIN_WHEEL.freeEvery s; spins stack and are saved
+// it. One free spin per SPIN_WHEEL.freeEvery s of play (offline time doesn't count); spins stack and are saved
 // (SPIN_WHEEL.saveKey). The wheel eases to the rolled wedge, then pays out.
 // While Bloxity has a rewarded ad to show, a "Watch Ad" button gives NET.adRewardSpins more
 // spins once the ad is watched and the game server has checked its token (rewardedAd).
@@ -27,12 +27,14 @@ const mmss = (s) => {
 // rewardedAd: { available() -> bool, watch() -> Promise<bool> (true = watched and verified) }
 export function createSpin(layer, { inv, income, giveBlock, hud, sfx, onWin, rewardedAd }) {
   const W = SPIN_WHEEL
-  const st = { spins: W.startSpins, nextAt: Date.now() + W.freeEvery * 1000 }
+  // `left` = seconds of play until the next free spin; it only counts down while the
+  // game is open and visible, so time spent away earns nothing.
+  const st = { spins: W.startSpins, left: W.freeEvery }
   try {
     const d = JSON.parse(localStorage.getItem(W.saveKey) || 'null')
     if (d) {
       st.spins = Math.max(0, d.spins | 0)
-      st.nextAt = d.nextAt || st.nextAt
+      if (d.left > 0 && d.left <= W.freeEvery) st.left = d.left
     }
   } catch {
     // defaults
@@ -44,15 +46,27 @@ export function createSpin(layer, { inv, income, giveBlock, hud, sfx, onWin, rew
       // ignore
     }
   }
-  // free spins that came due while away
+  // Count down only while the tab is visible; a long gap (tab hidden, game closed) is capped.
+  let last = performance.now()
   function accrue() {
-    const now = Date.now()
-    if (now < st.nextAt) return
-    const n = 1 + Math.floor((now - st.nextAt) / (W.freeEvery * 1000))
-    st.spins += n
-    st.nextAt += n * W.freeEvery * 1000
-    save()
+    const now = performance.now()
+    const dt = Math.min((now - last) / 1000, 1)
+    last = now
+    if (document.visibilityState !== 'visible') return
+    st.left -= dt
+    let got = false
+    while (st.left <= 0) {
+      st.spins++
+      st.left += W.freeEvery
+      got = true
+    }
+    if (got) save()
   }
+  window.addEventListener('pagehide', save)
+  document.addEventListener('visibilitychange', () => {
+    last = performance.now()
+    if (document.visibilityState === 'hidden') save()
+  })
 
   const cars = W.rewards.map((r) => (r.kind === 'car' ? makeCar({ rarity: r.rarity, name: r.name, look: r.look, bonus: r.bonus ?? 1 }) : null))
   const cashOf = (r) => Math.max(r.min, Math.round((income() * r.incomeSecs) / 1000) * 1000)
@@ -133,7 +147,7 @@ export function createSpin(layer, { inv, income, giveBlock, hud, sfx, onWin, rew
     accrue()
     goLabel.textContent = st.spins > 0 ? `Spin (${st.spins}x)` : 'Spin'
     goBtn.classList.toggle('waiting', st.spins <= 0 || spinning)
-    freeEl.textContent = `Free Spin in: ${mmss((st.nextAt - Date.now()) / 1000)}`
+    freeEl.textContent = `Free Spin in: ${mmss(st.left)}`
     hud.setSpins?.(st.spins)
     adBtn.hidden = !rewardedAd?.available()
     adBtn.classList.toggle('waiting', watching)
@@ -162,7 +176,7 @@ export function createSpin(layer, { inv, income, giveBlock, hud, sfx, onWin, rew
     accrue()
     if (st.spins <= 0) {
       sfx.error()
-      return hud.toast(`No spins left: next free spin in ${mmss((st.nextAt - Date.now()) / 1000)}`)
+      return hud.toast(`No spins left: next free spin in ${mmss(st.left)}`)
     }
     st.spins--
     save()

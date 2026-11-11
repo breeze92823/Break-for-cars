@@ -5,6 +5,7 @@ import {
   Color,
   Points,
   ShaderMaterial,
+  Vector2,
 } from 'three'
 import { mulberry32, paintSparkle, paintSoftDot, toTexture } from '../textures.js'
 
@@ -34,10 +35,19 @@ const vertex = /* glsl */ `
   uniform float uDrift;
   uniform float uSize;
   uniform float uView;
+  uniform vec2 uOrbit;
+  uniform float uSpin;
   varying float vAlpha;
   void main() {
     float t = fract(uTime / uLife * (0.75 + aSeed.w * 0.5) + aSeed.z);
     vec3 p = position;
+    if (uOrbit.x > 0.0) {
+      // orbit: each point circles an ellipse (uOrbit = radii) around the origin
+      float a = aSeed.x * 6.2832 + uTime * uSpin * (0.8 + aSeed.y * 0.4);
+      float k = 0.9 + aSeed.w * 0.2;
+      p.x = cos(a) * uOrbit.x * k;
+      p.z = sin(a) * uOrbit.y * k;
+    }
     p.y += t * uRise * uLife;
     p.x += sin(uTime * (0.8 + aSeed.x) + aSeed.z * 30.0) * uDrift;
     p.z += cos(uTime * (0.7 + aSeed.y) + aSeed.w * 30.0) * uDrift;
@@ -60,10 +70,28 @@ const fragment = /* glsl */ `
     gl_FragColor = vec4(uColor * tex.rgb * uBoost, a);
   }`
 
-const fields = []
+const fields = new Set()
+
+// Any material with a uTime uniform: updateFields drives it until it is disposed.
+export function trackTime(mat) {
+  fields.add(mat)
+  mat.addEventListener('dispose', () => fields.delete(mat))
+  return mat
+}
+
+// Disposes the effect objects (sparkle fields, auras: userData.fx) under `root`;
+// shared car / scene geometry is left alone.
+export function disposeFx(root) {
+  root?.traverse((o) => {
+    if (!o.userData.fx) return
+    o.geometry?.dispose()
+    o.material?.dispose()
+  })
+}
 
 // box: spawn volume half-extents around `center` (y spans 0..box.y above center.y).
-export function sparkleField({ count, center, box, rise = 0.6, life = 2.5, drift = 0.25, size = 0.35, color = '#ffffff', opacity = 1, soft = false, seed = 1 }) {
+// orbit: [rx, rz] makes every point circle that ellipse round the origin at `spin` rad/s.
+export function sparkleField({ count, center, box, rise = 0.6, life = 2.5, drift = 0.25, size = 0.35, color = '#ffffff', opacity = 1, soft = false, seed = 1, orbit = null, spin = 0.6 }) {
   textures()
   const rand = mulberry32(seed)
   const pos = new Float32Array(count * 3)
@@ -89,6 +117,8 @@ export function sparkleField({ count, center, box, rise = 0.6, life = 2.5, drift
       uColor: { value: new Color(color) },
       uBoost: fxBoost,
       uOpacity: { value: opacity },
+      uOrbit: { value: new Vector2(orbit?.[0] ?? 0, orbit?.[1] ?? 0) },
+      uSpin: { value: spin },
     },
     vertexShader: vertex,
     fragmentShader: fragment,
@@ -98,7 +128,8 @@ export function sparkleField({ count, center, box, rise = 0.6, life = 2.5, drift
   })
   const points = new Points(geo, mat)
   points.frustumCulled = false
-  fields.push(mat)
+  points.userData.fx = true
+  trackTime(mat)
   return points
 }
 
